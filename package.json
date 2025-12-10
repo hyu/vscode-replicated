@@ -16,10 +16,47 @@
     "theme": "dark"
   },
   "activationEvents": [
-    "onCommand:replicated.lint.enable"
+    "onCommand:replicated.lint.enable",
+    "onView:replicatedManifests"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "replicated",
+          "title": "Replicated",
+          "icon": "img/replicated-sidebar.svg"
+        }
+      ]
+    },
+    "views": {
+      "replicated": [
+        {
+          "id": "replicatedActions",
+          "name": "Actions"
+        },
+        {
+          "id": "replicatedManifests",
+          "name": "Manifests"
+        },
+        {
+          "id": "replicatedCLIStatus",
+          "name": "CLI Status",
+          "when": "!replicated.cliInstalled"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "replicatedActions",
+        "contents": "[$(rocket) Test in Environment](command:replicated.testInEnvironment)\nDeploy and test your manifests in a selected environment."
+      },
+      {
+        "view": "replicatedCLIStatus",
+        "contents": "The Replicated CLI is not installed.\n[Install CLI](command:replicated.installCLI)\n[Check Status](command:replicated.checkCLI)"
+      }
+    ],
     "commands": [
       {
         "command": "replicated.lint.enable",
@@ -28,8 +65,77 @@
       {
         "command": "replicated.lint.disable",
         "title": "Replicated Lint Disable"
+      },
+      {
+        "command": "replicated.lintAll",
+        "title": "Lint All Manifests",
+        "icon": "$(play)"
+      },
+      {
+        "command": "replicated.lintFile",
+        "title": "Lint File",
+        "icon": "$(check)"
+      },
+      {
+        "command": "replicated.refreshManifests",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "replicated.openManifest",
+        "title": "Open Manifest"
+      },
+      {
+        "command": "replicated.testInEnvironment",
+        "title": "Test in Environment",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "replicated.installCLI",
+        "title": "Install Replicated CLI",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "replicated.checkCLI",
+        "title": "Check CLI Status",
+        "icon": "$(refresh)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "replicated.testInEnvironment",
+          "when": "view == replicatedManifests",
+          "group": "navigation@1"
+        },
+        {
+          "command": "replicated.lintAll",
+          "when": "view == replicatedManifests",
+          "group": "navigation@2",
+          "icon": "$(play)"
+        },
+        {
+          "command": "replicated.refreshManifests",
+          "when": "view == replicatedManifests",
+          "group": "navigation@3",
+          "icon": "$(refresh)"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "replicated.lintFile",
+          "when": "view == replicatedManifests && viewItem == manifestFile",
+          "group": "inline"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "replicated.installCLI",
+          "when": "view == replicatedCLIStatus",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "Replicated",
       "properties": {
@@ -52,12 +158,13 @@
   },
   "dependencies": {
     "got": "11.8.3",
-    "tar": "^6.1.13"
+    "tar": "^6.1.13",
+    "yaml": "^2.8.2"
   },
   "devDependencies": {
     "@types/glob": "^8.0.0",
     "@types/mocha": "^10.0.1",
-    "@types/node": "16.x",
+    "@types/node": "^16.18.126",
     "@types/tar": "^6.1.3",
     "@types/vscode": "^1.74.0",
     "@typescript-eslint/eslint-plugin": "^5.45.0",
