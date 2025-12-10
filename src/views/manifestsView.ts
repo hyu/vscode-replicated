@@ -9,91 +9,73 @@ import {
     categorizeByInstallMethod, 
     getKindDescription, 
     getIconForKind,
+    getKindDocsUrl,
     InstallMethod
 } from '../utils/manifestUtils';
 
 /**
- * File decoration provider that shows EM SPACE badge for unmodified files
- * Maintains alignment with git's "M" decoration without showing visible characters
+ * Maintains consistent spacing in tree view when files lack Git decorations
  */
-class ManifestDecorationProvider implements vscode.FileDecorationProvider {
+class GitPlaceholderDecorationProvider implements vscode.FileDecorationProvider {
     private _onDidChangeFileDecorations = new vscode.EventEmitter<vscode.Uri | vscode.Uri[]>();
     readonly onDidChangeFileDecorations = this._onDidChangeFileDecorations.event;
+    private filesNeedingPlaceholder = new Set<string>();
 
-    private fileInfo = new Map<string, { kind: string; isModified: boolean }>();
-
-    setFileInfo(fsPath: string, kind: string | undefined, isModified: boolean) {
-        if (kind) {
-            this.fileInfo.set(fsPath, { kind, isModified });
-        } else {
-            this.fileInfo.delete(fsPath);
-        }
+    setPlaceholder(fsPath: string, needsPlaceholder: boolean) {
+        needsPlaceholder 
+            ? this.filesNeedingPlaceholder.add(fsPath)
+            : this.filesNeedingPlaceholder.delete(fsPath);
         this._onDidChangeFileDecorations.fire(vscode.Uri.file(fsPath));
     }
 
-    provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
-        const info = this.fileInfo.get(uri.fsPath);
-        
-        // Only show decoration for unmodified files to maintain alignment
-        if (!info || info.isModified) {
-            return undefined;
-        }
+    clear() {
+        this.filesNeedingPlaceholder.clear();
+        this._onDidChangeFileDecorations.fire(vscode.Uri.file('/'));
+    }
 
-        // EM SPACE matches width of 'M' in monospace fonts
-        return {
-            badge: '\u2003',
-            tooltip: `Kind: ${info.kind}`
-        };
+    provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
+        return this.filesNeedingPlaceholder.has(uri.fsPath)
+            ? { badge: ' ', tooltip: 'No changes' } // Em space (U+2003)
+            : undefined;
     }
 }
 
 /**
- * Tree data provider for the Manifests view
- * Organizes manifest files by install method (Shared, Embedded Cluster, KOTS, Helm)
+ * Organizes Replicated manifest files by install method in VS Code tree view
  */
 export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<ManifestItem | undefined | void> = new vscode.EventEmitter<ManifestItem | undefined | void>();
-    readonly onDidChangeTreeData: vscode.Event<ManifestItem | undefined | void> = this._onDidChangeTreeData.event;
+    private _onDidChangeTreeData = new vscode.EventEmitter<ManifestItem | undefined | void>();
+    readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-    private lintStatuses: Map<string, LintStatus> = new Map();
+    private lintStatuses = new Map<string, LintStatus>();
+    private lintHasRun = false;
     private gitApi: any | undefined;
-    private decorationProvider: ManifestDecorationProvider;
+    private gitPlaceholderProvider: GitPlaceholderDecorationProvider;
 
     constructor(private diagnosticCollection: vscode.DiagnosticCollection) {
-        // Initialize decoration provider
-        this.decorationProvider = new ManifestDecorationProvider();
-        vscode.window.registerFileDecorationProvider(this.decorationProvider);
+        this.gitPlaceholderProvider = new GitPlaceholderDecorationProvider();
+        vscode.window.registerFileDecorationProvider(this.gitPlaceholderProvider);
 
-        // Watch for diagnostic changes to update tree
         vscode.languages.onDidChangeDiagnostics(() => {
             this.updateLintStatuses();
             this.refresh();
         });
 
-        // Try to get git extension API asynchronously (optional - gracefully handle if not available)
         this.initializeGitApi();
     }
 
     private async initializeGitApi(): Promise<void> {
         try {
             const gitExtension = vscode.extensions.getExtension('vscode.git');
-            if (gitExtension) {
-                // Activate the extension if needed
-                if (!gitExtension.isActive) {
-                    await gitExtension.activate();
-                }
-                if (gitExtension.exports) {
-                    this.gitApi = gitExtension.exports.getAPI(1);
-                    // Watch for git changes to update decorations
-                    if (this.gitApi) {
-                        this.gitApi.onDidChangeState(() => {
-                            this.refresh();
-                        });
-                    }
-                }
+            if (!gitExtension) return;
+
+            if (!gitExtension.isActive) {
+                await gitExtension.activate();
             }
+
+            this.gitApi = gitExtension.exports?.getAPI(1);
+            this.gitApi?.onDidChangeState(() => this.refresh());
         } catch (error) {
-            // Git extension not available - continue without it
             console.log('Git extension not available:', error);
         }
     }
@@ -105,11 +87,13 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     private updateLintStatuses(): void {
         this.lintStatuses.clear();
         
-        // Get all diagnostics
         this.diagnosticCollection.forEach((uri, diagnostics) => {
-            const errors = diagnostics.filter(d => d.severity === vscode.DiagnosticSeverity.Error).length;
-            const warnings = diagnostics.filter(d => d.severity === vscode.DiagnosticSeverity.Warning).length;
-            const info = diagnostics.filter(d => d.severity === vscode.DiagnosticSeverity.Information).length;
+            const countBySeverity = (severity: vscode.DiagnosticSeverity) =>
+                diagnostics.filter(d => d.severity === severity).length;
+
+            const errors = countBySeverity(vscode.DiagnosticSeverity.Error);
+            const warnings = countBySeverity(vscode.DiagnosticSeverity.Warning);
+            const info = countBySeverity(vscode.DiagnosticSeverity.Information);
             
             this.lintStatuses.set(uri.fsPath, {
                 errors,
@@ -118,6 +102,15 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
                 hasIssues: errors > 0 || warnings > 0 || info > 0
             });
         });
+        
+        if (this.lintStatuses.size > 0) {
+            this.lintHasRun = true;
+        }
+    }
+    
+    public markLintAsRun(): void {
+        this.lintHasRun = true;
+        this.refresh();
     }
 
     getTreeItem(element: ManifestItem): vscode.TreeItem {
@@ -130,27 +123,24 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             return [];
         }
 
-        // If we have an element with children, return them
         if (element) {
-            if (element.children && element.children.length > 0) {
-                return element.children;
-            }
-            if (element.isDirectory && element.filePath) {
-                return this.getDirectoryChildren(element.filePath, element.basePath!);
-            }
-            return [];
+            return element.children?.length ? element.children :
+                   element.isDirectory && element.filePath ? this.getDirectoryChildren(element.filePath, element.basePath!) :
+                   [];
         }
 
-        // Root level - get manifest folder contents and organize by category
-        for (const folder of vscode.workspace.workspaceFolders) {
+        // Root level: organize manifests by install method
+        return this.getRootManifests();
+    }
+
+    private getRootManifests(): ManifestItem[] {
+        for (const folder of vscode.workspace.workspaceFolders!) {
             const manifestFolder = vscode.workspace.getConfiguration('replicated').get<string>('manifestsFolder', 'manifests');
             const manifestPath = path.join(folder.uri.fsPath, manifestFolder);
             
             if (fs.existsSync(manifestPath)) {
-                const organizedItems = this.getOrganizedManifests(manifestPath);
-                if (organizedItems.length > 0) {
-                    return organizedItems;
-                }
+                const items = this.getOrganizedManifests(manifestPath);
+                if (items.length > 0) return items;
             }
         }
 
@@ -168,74 +158,71 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
 
     private getOrganizedManifests(manifestPath: string): ManifestItem[] {
         const allFiles = this.collectAllManifestFiles(manifestPath, manifestPath);
-        
-        if (allFiles.length === 0) {
-            return [];
-        }
+        if (allFiles.length === 0) return [];
 
-        // Categorize files by install method
-        const categorizedFiles = new Map<InstallMethod, ManifestItem[]>();
-        categorizedFiles.set('unidentified', []);
-        categorizedFiles.set('shared', []);
-        categorizedFiles.set('embedded-cluster', []);
-        categorizedFiles.set('kots', []);
-        categorizedFiles.set('helm', []);
+        const categorizedFiles = this.categorizeFiles(allFiles);
+        return this.buildCategoryTree(categorizedFiles, manifestPath);
+    }
+
+    private categorizeFiles(files: ManifestItem[]): Map<InstallMethod, ManifestItem[]> {
+        const categories = new Map<InstallMethod, ManifestItem[]>([
+            ['unidentified', []],
+            ['shared', []],
+            ['embedded-cluster', []],
+            ['kots', []],
+            ['helm', []]
+        ]);
         
-        for (const fileItem of allFiles) {
+        for (const fileItem of files) {
             const manifestInfo = this.parseManifestKind(fileItem.filePath || '');
             const category = categorizeByInstallMethod(
                 manifestInfo.kind,
                 manifestInfo.apiVersion,
                 fileItem.label.toLowerCase()
             );
-            
-            categorizedFiles.get(category)!.push(fileItem);
-        }
-
-        const categories: ManifestItem[] = [];
-
-        // Show unidentified files at the top level
-        const unidentified = categorizedFiles.get('unidentified')!;
-        if (unidentified.length > 0) {
-            categories.push(...unidentified);
-        }
-
-        // Create categories dynamically
-        for (const config of CATEGORY_CONFIGS) {
-            const files = categorizedFiles.get(config.id)!;
-            
-            if (config.separator) {
-                categories.push(this.createSeparator());
-            }
-            
-            categories.push(this.createCategoryItem(
-                config.title,
-                config.icon,
-                config.tooltip,
-                files,
-                manifestPath
-            ));
+            categories.get(category)!.push(fileItem);
         }
 
         return categories;
     }
 
-    /**
-     * Creates a category item for the tree view
-     */
+    private buildCategoryTree(categorizedFiles: Map<InstallMethod, ManifestItem[]>, manifestPath: string): ManifestItem[] {
+        const tree: ManifestItem[] = [];
+
+        // Unidentified files appear at top level
+        tree.push(...categorizedFiles.get('unidentified')!);
+
+        for (const config of CATEGORY_CONFIGS) {
+            if (config.separator) {
+                tree.push(this.createSeparator());
+            }
+            
+            tree.push(this.createCategoryItem(
+                config.title,
+                config.icon,
+                config.tooltip,
+                config.docsUrl,
+                categorizedFiles.get(config.id)!,
+                manifestPath
+            ));
+        }
+
+        return tree;
+    }
+
     private createCategoryItem(
         title: string,
         icon: string,
         tooltip: string,
+        docsUrl: string | undefined,
         files: ManifestItem[],
         manifestPath: string
     ): ManifestItem {
-        const fileCount = files.length;
-        const description = fileCount > 0 
-            ? `${fileCount} file${fileCount !== 1 ? 's' : ''}` 
+        const description = files.length > 0 
+            ? `${files.length} file${files.length !== 1 ? 's' : ''}` 
             : 'No files';
         
-        const categoryItem = new ManifestItem(
+        const item = new ManifestItem(
             title,
             description,
             vscode.TreeItemCollapsibleState.Expanded,
@@ -245,11 +232,17 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             true,
             manifestPath
         );
-        categoryItem.iconPath = new vscode.ThemeIcon(icon);
-        categoryItem.tooltip = tooltip;
-        categoryItem.children = files;
         
-        return categoryItem;
+        item.iconPath = new vscode.ThemeIcon(icon);
+        item.tooltip = tooltip;
+        item.children = files;
+        
+        if (docsUrl) {
+            item.contextValue = 'categoryWithDocs';
+            (item as any).docsUrl = docsUrl;
+        }
+        
+        return item;
     }
 
     private createSeparator(): ManifestItem {
@@ -258,13 +251,12 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             '',
             vscode.TreeItemCollapsibleState.None,
             undefined,
-            '',  // iconType - empty string for no icon
+            '',
             undefined,
             false,
             undefined
         );
         separator.contextValue = 'separator';
-        separator.tooltip = undefined;  // No tooltip for separators
         return separator;
     }
 
@@ -278,54 +270,55 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
                 const fullPath = path.join(dirPath, entry.name);
                 
                 if (entry.isDirectory()) {
-                    // Recursively collect from subdirectories
                     items.push(...this.collectAllManifestFiles(fullPath, basePath));
-                } else if (entry.isFile() && this.isManifestFile(entry.name)) {
-                    const fileItem = this.createFileItem(fullPath, basePath, entry.name);
-                    items.push(fileItem);
+                } else if (this.isManifestFile(entry.name)) {
+                    items.push(this.createFileItem(fullPath, basePath, entry.name));
                 }
             }
         } catch (error) {
             console.error(`Error reading directory ${dirPath}:`, error);
         }
         
-        // Sort files alphabetically
-        items.sort((a, b) => a.label.localeCompare(b.label));
-        
-        return items;
+        return items.sort((a, b) => a.label.localeCompare(b.label));
     }
 
     private createFileItem(fullPath: string, basePath: string, fileName: string): ManifestItem {
         const lintStatus = this.lintStatuses.get(fullPath);
         const manifestInfo = this.parseManifestKind(fullPath);
-        const isModified = this.isFileModified(fullPath);
         
-        this.decorationProvider.setFileInfo(fullPath, manifestInfo.kind, isModified);
+        // Get documentation URL
+        const docsUrl = getKindDocsUrl(manifestInfo.apiVersion, manifestInfo.kind, fileName);
         
+        // Get icon for the manifest kind
+        const iconPath = getIconForKind(manifestInfo.kind);
+        
+        // Check if file has Git status - if not, add em space placeholder for consistent layout
+        const gitStatus = this.getGitStatus(fullPath);
+        this.gitPlaceholderProvider.setPlaceholder(fullPath, !gitStatus);
+        
+        // Set description to show the kind
         let description = '';
-        let iconPath = getIconForKind(manifestInfo.kind);
-        
-        if (lintStatus && lintStatus.hasIssues) {
-            const parts: string[] = [];
-            if (lintStatus.errors > 0) {
-                parts.push(`${lintStatus.errors} error${lintStatus.errors !== 1 ? 's' : ''}`);
-                iconPath = 'error';
-            }
-            if (lintStatus.warnings > 0) {
-                parts.push(`${lintStatus.warnings} warning${lintStatus.warnings !== 1 ? 's' : ''}`);
-                if (iconPath !== 'error') {
-                    iconPath = 'warning';
-                }
-            }
-            if (lintStatus.info > 0) {
-                parts.push(`${lintStatus.info} info`);
-                if (iconPath !== 'error' && iconPath !== 'warning') {
-                    iconPath = 'info-icon';
-                }
-            }
-            description = parts.join(', ').trim();
-        } else if (manifestInfo.kind) {
+        if (manifestInfo.kind) {
             description = manifestInfo.kind.trim();
+        }
+        
+        // Add lint status to description for now (will be inline button on hover later)
+        if (this.lintHasRun) {
+            if (lintStatus && lintStatus.hasIssues) {
+                const parts: string[] = [];
+                if (lintStatus.errors > 0) {
+                    parts.push(`${lintStatus.errors} error${lintStatus.errors !== 1 ? 's' : ''}`);
+                }
+                if (lintStatus.warnings > 0) {
+                    parts.push(`${lintStatus.warnings} warning${lintStatus.warnings !== 1 ? 's' : ''}`);
+                }
+                if (lintStatus.info > 0) {
+                    parts.push(`${lintStatus.info} info`);
+                }
+                if (parts.length > 0 && description) {
+                    description += ' - ' + parts.join(' ');
+                }
+            }
         }
         
         const item = new ManifestItem(
@@ -360,9 +353,51 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         }
         item.tooltip = tooltipParts.join('\n\n');
         
-        item.contextValue = 'manifestFile';
+        // Set context value for menus (determines which inline buttons show on hover)
+        // Info button will show on hover for files with docs
+        // Lint button will show on hover for all files
+        if (docsUrl) {
+            item.contextValue = 'manifestFileWithDocs';
+            (item as any).docsUrl = docsUrl;
+        } else {
+            item.contextValue = 'manifestFile';
+        }
         
         return item;
+    }
+    
+    /**
+     * Get Git status for a file
+     */
+    private getGitStatus(filePath: string): 'M' | 'A' | 'D' | 'U' | undefined {
+        if (!this.gitApi || this.gitApi.repositories.length === 0) {
+            return undefined;
+        }
+
+        try {
+            const repo = this.gitApi.repositories[0];
+            const workingTreeChanges = repo.state.workingTreeChanges || [];
+            const indexChanges = repo.state.indexChanges || [];
+            const untrackedFiles = repo.state.untrackedChanges || [];
+            
+            // Check if file is untracked
+            if (untrackedFiles.some((change: any) => change.uri.fsPath === filePath)) {
+                return 'U';
+            }
+            
+            // Check if file is in index (staged)
+            const isInIndex = indexChanges.some((change: any) => change.uri.fsPath === filePath);
+            const isInWorkingTree = workingTreeChanges.some((change: any) => change.uri.fsPath === filePath);
+            
+            if (isInWorkingTree || isInIndex) {
+                return 'M';
+            }
+            
+            return undefined;
+        } catch (error) {
+            console.error('Error checking git status:', error);
+            return undefined;
+        }
     }
 
     private getDirectoryChildren(dirPath: string, basePath: string): ManifestItem[] {
@@ -448,31 +483,6 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     private isManifestFile(filename: string): boolean {
         const ext = path.extname(filename).toLowerCase();
         return ext === '.yaml' || ext === '.yml';
-    }
-
-    private isFileModified(filePath: string): boolean {
-        if (!this.gitApi || this.gitApi.repositories.length === 0) {
-            return false;
-        }
-
-        try {
-            const repo = this.gitApi.repositories[0];
-            const workingTreeChanges = repo.state.workingTreeChanges || [];
-            const indexChanges = repo.state.indexChanges || [];
-            
-            // Check if file is in working tree changes or staged changes
-            const isInWorkingTree = workingTreeChanges.some((change: any) => 
-                change.uri.fsPath === filePath
-            );
-            const isInIndex = indexChanges.some((change: any) => 
-                change.uri.fsPath === filePath
-            );
-            
-            return isInWorkingTree || isInIndex;
-        } catch (error) {
-            console.error('Error checking git status:', error);
-            return false;
-        }
     }
 }
 

@@ -45,7 +45,7 @@ export const CATEGORY_CONFIGS: CategoryConfig[] = [
         title: 'Helm CLI',
         icon: 'symbol-method',
         tooltip: 'Helm CLI is a popular install method for customers with existing Kubernetes clusters.',
-        docsUrl: 'https://docs.replicated.com/vendor/helm-install-overview',
+        docsUrl: 'https://docs.replicated.com/vendor/install-with-helm',
         separator: true
     }
 ];
@@ -214,56 +214,48 @@ export function getIconForKind(kind: string | undefined): string {
 }
 
 /**
- * Documentation URLs for manifest kinds
+ * Returns documentation URL for a given manifest kind
  */
-const KIND_DOCS_URLS = new Map<string, string>([
-    // Replicated KOTS Resources
-    ['kots.io/v1beta1/Config', 'https://docs.replicated.com/reference/kots-kinds-config'],
-    ['kots.io/v1beta1/Application', 'https://docs.replicated.com/reference/kots-kinds-application'],
-    ['kots.io/v1beta2/HelmChart', 'https://docs.replicated.com/reference/kots-kinds-helmchart'],
-    ['kots.io/v1beta1/ConfigValues', 'https://docs.replicated.com/reference/kots-kinds-configvalues'],
-    ['kots.io/v1beta1/LintConfig', 'https://docs.replicated.com/reference/kots-kinds-lintconfig'],
-    
-    // Embedded Cluster
-    ['embeddedcluster.replicated.com/v1beta1/Config', 'https://docs.replicated.com/vendor/embedded-overview'],
-    
-    // Troubleshoot Resources
-    ['troubleshoot.sh/v1beta2/Preflight', 'https://troubleshoot.sh/docs/preflight/'],
-    ['troubleshoot.sh/v1beta2/SupportBundle', 'https://troubleshoot.sh/docs/support-bundle/'],
-    ['troubleshoot.sh/v1beta2/Redactor', 'https://troubleshoot.sh/docs/redactor/'],
-    ['troubleshoot.sh/v1beta2/Analyzer', 'https://troubleshoot.sh/docs/analyze/'],
-]);
-
-/**
- * Gets documentation URL for a manifest kind
- */
-export function getKindDocsUrl(
-    apiVersion: string | undefined,
-    kind: string | undefined,
-    fileName: string
-): string | undefined {
-    if (!apiVersion || !kind) {
+export function getKindDocsUrl(apiVersion: string | undefined, kind: string | undefined, fileName: string): string | undefined {
+    if (!kind) {
         return undefined;
     }
-    
-    const key = `${apiVersion}/${kind}`;
-    const url = KIND_DOCS_URLS.get(key);
-    
-    if (url) {
-        return url;
+
+    // Map Replicated-specific kinds to their documentation
+    /* eslint-disable @typescript-eslint/naming-convention */
+    const replicatedDocsMap: { [key: string]: string } = {
+        'Config': 'https://docs.replicated.com/vendor/config-screen-about',
+        'Application': 'https://docs.replicated.com/reference/custom-resource-application',
+        'ConfigValues': 'https://docs.replicated.com/reference/custom-resource-configvalues',
+        'LintConfig': 'https://docs.replicated.com/reference/custom-resource-lintconfig',
+        'SupportBundle': 'https://docs.replicated.com/reference/custom-resource-supportbundle',
+        'Preflight': 'https://docs.replicated.com/reference/custom-resource-preflight',
+        'Analyzer': 'https://docs.replicated.com/reference/custom-resource-analyzer',
+        'Collector': 'https://docs.replicated.com/reference/custom-resource-collector',
+        'HelmChart': 'https://docs.replicated.com/vendor/helm-native-about',
+        'Backup': 'https://docs.replicated.com/reference/custom-resource-backup',
+        'Identity': 'https://docs.replicated.com/reference/custom-resource-identity',
+        'IdentityConfig': 'https://docs.replicated.com/reference/custom-resource-identityconfig',
+    };
+    /* eslint-enable @typescript-eslint/naming-convention */
+
+    // Check if it's a Replicated kind
+    if (apiVersion?.includes('kots.io') || apiVersion?.includes('troubleshoot.sh') || apiVersion?.includes('velero.io')) {
+        // Return specific docs URL if found, otherwise fallback to general custom resources page
+        return replicatedDocsMap[kind] || 'https://docs.replicated.com/reference/custom-resource-about';
     }
-    
-    // Fallback: link to general Kubernetes docs for standard K8s resources
-    if (apiVersion.startsWith('apps/v1') || apiVersion.startsWith('v1/') || apiVersion.startsWith('networking.k8s.io/')) {
-        const kindLower = kind.toLowerCase();
-        return `https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/${kindLower}-v1/`;
+
+    // For embedded cluster config
+    if (fileName === 'embedded-cluster.yaml' || apiVersion?.includes('embeddedcluster.replicated.com')) {
+        return 'https://docs.replicated.com/reference/embedded-config';
     }
-    
-    // Fallback: link to Replicated docs for unknown Replicated kinds
-    if (isKnownReplicatedKind(kind)) {
-        return 'https://docs.replicated.com/reference/kots-kinds';
+
+    // For standard Kubernetes resources, return general K8s docs
+    const k8sKinds = ['Deployment', 'Service', 'ConfigMap', 'Secret', 'StatefulSet', 'Ingress', 'PersistentVolumeClaim', 'Pod', 'Namespace'];
+    if (k8sKinds.includes(kind)) {
+        return `https://kubernetes.io/docs/concepts/workloads/controllers/${kind.toLowerCase()}/`;
     }
-    
+
     return undefined;
 }
 

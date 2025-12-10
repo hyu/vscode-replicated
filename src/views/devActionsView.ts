@@ -236,19 +236,6 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                 .cli-icon {
                     font-size: 14px;
                 }
-                .cli-action {
-                    background: transparent;
-                    border: none;
-                    color: var(--vscode-textLink-foreground);
-                    cursor: pointer;
-                    padding: 2px 4px;
-                    font-size: 12px;
-                    font-family: var(--vscode-font-family);
-                }
-                .cli-action:hover {
-                    text-decoration: underline;
-                    color: var(--vscode-textLink-activeForeground);
-                }
                 .icon-button {
                     background: transparent;
                     border: none;
@@ -262,94 +249,6 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                 }
                 .icon-button:hover {
                     background-color: var(--vscode-toolbar-hoverBackground);
-                }
-                
-                .spinner {
-                    display: inline-block;
-                    width: 14px;
-                    height: 14px;
-                    border: 2px solid var(--vscode-descriptionForeground);
-                    border-top-color: transparent;
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                }
-                @keyframes spin {
-                    to { transform: rotate(360deg); }
-                }
-                
-                /* Resources Section */
-                .resources-section {
-                    display: block;
-                    margin-top: 12px;
-                    padding-top: 12px;
-                    border-top: 1px solid var(--vscode-panel-border);
-                }
-                .resources-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 8px;
-                }
-                .resources-title {
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: var(--vscode-foreground);
-                }
-                .resource-list {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 2px;
-                }
-                .resource-item {
-                    font-size: 11px;
-                    font-family: var(--vscode-editor-font-family);
-                    padding: 2px 0;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    color: var(--vscode-descriptionForeground);
-                }
-                .resource-icon {
-                    font-size: 10px;
-                    width: 12px;
-                    flex-shrink: 0;
-                }
-                .resource-status {
-                    display: inline-block;
-                    width: 6px;
-                    height: 6px;
-                    border-radius: 50%;
-                    background-color: var(--vscode-testing-iconPassed);
-                    flex-shrink: 0;
-                }
-                .resource-status.warning {
-                    background-color: var(--vscode-editorWarning-foreground);
-                }
-                .resource-name {
-                    flex: 1;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    white-space: nowrap;
-                }
-                .resource-detail {
-                    font-size: 10px;
-                    opacity: 0.8;
-                }
-                .dashboard-button {
-                    background-color: var(--vscode-button-secondaryBackground);
-                    color: var(--vscode-button-secondaryForeground);
-                    border: none;
-                    padding: 4px 10px;
-                    cursor: pointer;
-                    font-size: 11px;
-                    font-family: var(--vscode-font-family);
-                    border-radius: 2px;
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                }
-                .dashboard-button:hover {
-                    background-color: var(--vscode-button-secondaryHoverBackground);
                 }
             </style>
         </head>
@@ -386,84 +285,6 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                     <button class="icon-button" id="cliAction" onclick="handleCLIAction()" title="Check for updates">
                         <span id="cliActionIcon">↻</span>
                     </button>
-                </div>
-                
-                <!-- Resources Section - FAKE DATA FOR TESTING -->
-                <div class="resources-section" id="resourcesSection" style="display: block;">
-                    <div class="resources-header">
-                        <span class="resources-title">🎲 random-linux-42</span>
-                        <button class="dashboard-button" onclick="openDashboard()">
-                            <span>📊</span>
-                            <span>Dashboard</span>
-                        </button>
-                    </div>
-                    <div class="resource-list">
-                        <!-- FAKE TEST DATA - Deployments -->
-                        <div class="resource-item">
-                            <span class="resource-status"></span>
-                            <span class="resource-icon">📦</span>
-                            <span class="resource-name">han</span>
-                            <span class="resource-detail">1/1</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-status"></span>
-                            <span class="resource-icon">📦</span>
-                            <span class="resource-name">han-frontend</span>
-                            <span class="resource-detail">3/3</span>
-                        </div>
-                        <!-- FAKE TEST DATA - Pods -->
-                        <div class="resource-item">
-                            <span class="resource-status"></span>
-                            <span class="resource-icon">🔷</span>
-                            <span class="resource-name">han-7c9f8d6b5-x4k2p</span>
-                            <span class="resource-detail">Running</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-status"></span>
-                            <span class="resource-icon">🔷</span>
-                            <span class="resource-name">han-frontend-6b8c9d7f4-m5n6q</span>
-                            <span class="resource-detail">Running</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-status"></span>
-                            <span class="resource-icon">🔷</span>
-                            <span class="resource-name">han-frontend-6b8c9d7f4-p9r7s</span>
-                            <span class="resource-detail">Running</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-status warning"></span>
-                            <span class="resource-icon">🔷</span>
-                            <span class="resource-name">han-frontend-6b8c9d7f4-t3v8w</span>
-                            <span class="resource-detail">1 restart</span>
-                        </div>
-                        <!-- FAKE TEST DATA - Services -->
-                        <div class="resource-item">
-                            <span class="resource-status"></span>
-                            <span class="resource-icon">🌐</span>
-                            <span class="resource-name">han</span>
-                            <span class="resource-detail">ClusterIP</span>
-                        </div>
-                        <div class="resource-item">
-                            <span class="resource-status"></span>
-                            <span class="resource-icon">🌐</span>
-                            <span class="resource-name">han-frontend</span>
-                            <span class="resource-detail">LoadBalancer</span>
-                        </div>
-                        <!-- FAKE TEST DATA - ConfigMaps -->
-                        <div class="resource-item">
-                            <span class="resource-status"></span>
-                            <span class="resource-icon">⚙️</span>
-                            <span class="resource-name">han-config</span>
-                            <span class="resource-detail">3 keys</span>
-                        </div>
-                        <!-- FAKE TEST DATA - Secrets -->
-                        <div class="resource-item">
-                            <span class="resource-status"></span>
-                            <span class="resource-icon">🔐</span>
-                            <span class="resource-name">han-support-bundle</span>
-                            <span class="resource-detail">Opaque</span>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -511,10 +332,6 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                     } else {
                         vscode.postMessage({ type: 'installCLI' });
                     }
-                }
-                
-                function openDashboard() {
-                    vscode.postMessage({ type: 'openDashboard' });
                 }
 
                 // Listen for status updates from extension

@@ -40,7 +40,8 @@
         },
         {
           "id": "replicatedActions",
-          "name": "Replicated Dev"
+          "name": "Replicated Dev",
+          "type": "webview"
         }
       ]
     },
@@ -65,7 +66,7 @@
       {
         "command": "replicated.lintFile",
         "title": "Lint File",
-        "icon": "$(check)"
+        "icon": "$(pass)"
       },
       {
         "command": "replicated.refreshManifests",
@@ -124,23 +125,23 @@
       ],
       "view/item/context": [
         {
+          "command": "replicated.openDocs",
+          "when": "view == replicatedManifests && viewItem == manifestFileWithDocs",
+          "group": "inline@1"
+        },
+        {
           "command": "replicated.lintFile",
           "when": "view == replicatedManifests && viewItem == manifestFile",
-          "group": "inline"
+          "group": "inline@2"
         },
         {
           "command": "replicated.lintFile",
           "when": "view == replicatedManifests && viewItem == manifestFileWithDocs",
-          "group": "inline"
+          "group": "inline@2"
         },
         {
           "command": "replicated.openDocs",
           "when": "view == replicatedManifests && viewItem == categoryWithDocs",
-          "group": "inline"
-        },
-        {
-          "command": "replicated.openDocs",
-          "when": "view == replicatedManifests && viewItem == manifestFileWithDocs",
           "group": "inline"
         }
       ]

@@ -8,7 +8,8 @@ import { LintService } from './services/lintService';
 import { registerCommands, withProgress, getManifestsPath } from './utils/commandUtils';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Replicated extension activated');
+    console.log('🚀 Replicated extension activated!');
+    console.log('Extension path:', context.extensionUri.fsPath);
     
     const diagnosticCollection = vscode.languages.createDiagnosticCollection('replicated');
     const cliService = CLIService.getInstance();
@@ -16,13 +17,14 @@ export function activate(context: vscode.ExtensionContext) {
     let enableOnSave = false;
 
     // Register dev actions view
+    console.log('📋 Registering DevActionsViewProvider with viewType:', DevActionsViewProvider.viewType);
     const devActionsViewProvider = new DevActionsViewProvider(context.extensionUri);
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider(
-            DevActionsViewProvider.viewType,
-            devActionsViewProvider
-        )
+    const registration = vscode.window.registerWebviewViewProvider(
+        DevActionsViewProvider.viewType,
+        devActionsViewProvider
     );
+    context.subscriptions.push(registration);
+    console.log('✅ DevActionsViewProvider registered successfully');
 
     // Register manifests tree view
     const manifestsViewProvider = new ManifestsViewProvider(diagnosticCollection);
@@ -52,6 +54,7 @@ export function activate(context: vscode.ExtensionContext) {
 		diagnosticCollection.clear();
 		enableOnSave = true;
 		devActionsViewProvider.setAutoLintEnabled(true);
+		manifestsViewProvider.markLintAsRun();
 		lintService.lintWorkspace(diagnosticCollection);
 	});
 
@@ -68,6 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let d3 = vscode.workspace.onDidSaveTextDocument((document: vscode.TextDocument) => {
 		if (enableOnSave) {
 			diagnosticCollection.clear();
+			manifestsViewProvider.markLintAsRun();
 			lintService.lintWorkspace(diagnosticCollection);
 		}
 	});
@@ -75,6 +79,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// Lint all manifests command
 	let d4 = vscode.commands.registerCommand('replicated.lintAll', async () => {
 		diagnosticCollection.clear();
+		manifestsViewProvider.markLintAsRun();
 		await vscode.window.withProgress({
 			location: vscode.ProgressLocation.Notification,
 			title: "Linting all manifests...",
@@ -128,6 +133,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let d8 = vscode.commands.registerCommand('replicated.lintFile', async (item: any) => {
 		if (item && item.filePath) {
 			diagnosticCollection.clear();
+			manifestsViewProvider.markLintAsRun();
 			await vscode.window.withProgress({
 				location: vscode.ProgressLocation.Notification,
 				title: `Linting ${path.basename(item.filePath)}...`,
@@ -178,6 +184,7 @@ export function activate(context: vscode.ExtensionContext) {
 			diagnosticCollection.clear();
 			enableOnSave = true;
 			devActionsViewProvider.setAutoLintEnabled(true);
+			manifestsViewProvider.markLintAsRun();
 			await lintService.lintWorkspace(diagnosticCollection);
 		}
 	});

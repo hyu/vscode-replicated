@@ -19,38 +19,19 @@ export class ManifestItem extends vscode.TreeItem {
         super(label, collapsibleState);
         this.description = description;
         
-        // Don't override icon for folders
-        if (!isDirectory) {
-            // Set icon based on lint status
-            switch (iconType) {
-                case 'error':
-                    this.iconPath = new vscode.ThemeIcon('error');
-                    break;
-                case 'warning':
-                    this.iconPath = new vscode.ThemeIcon('warning');
-                    break;
-                case 'info-icon':
-                    this.iconPath = new vscode.ThemeIcon('info');
-                    break;
-                case 'pass':
-                    // Use pass/check icon for files that pass validation
-                    this.iconPath = new vscode.ThemeIcon('pass');
-                    break;
-                case 'package':
-                    // Application/runtime resources (Deployments, Services, ConfigMaps, Secrets, etc.)
-                    this.iconPath = new vscode.ThemeIcon('package');
-                    break;
-                case 'code':
-                    // Configuration/admin resources (Config, Application, Preflight, etc.)
-                    this.iconPath = new vscode.ThemeIcon('code');
-                    break;
-                case '':
-                    // Empty string means no icon (used for separators)
-                    this.iconPath = undefined;
-                    break;
-                default:
-                    this.iconPath = new vscode.ThemeIcon('file-code');
-            }
+        // Set icon based on type
+        if (isDirectory) {
+            // Folders use folder icon
+            this.iconPath = vscode.ThemeIcon.Folder;
+        } else if (iconType === 'folder') {
+            // Category items
+            this.iconPath = new vscode.ThemeIcon(iconType);
+        } else if (iconType === '') {
+            // Empty string means no icon (used for separators)
+            this.iconPath = undefined;
+        } else {
+            // Files use file-code icon (decorations will show info, git, lint badges)
+            this.iconPath = new vscode.ThemeIcon('file-code');
         }
         
         if (filePath) {
