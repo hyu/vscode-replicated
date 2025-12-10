@@ -10,20 +10,19 @@ The extension adds a dedicated Replicated panel to the Activity Bar (left sideba
 
 #### 1. Manifests View
 
-- **All manifest files** in your configured manifests folder
-- **Intelligent sorting** of manifests:
-  - Replicated/KOTS manifests first (Application, Config, Preflight, Analyzer, SupportBundle, HelmChart, Backup)
-  - Kubernetes resources next (Services, Deployments, StatefulSets, etc.)
-  - Alphabetical within each category
-- **Visual kind badges** showing the resource type (📦 Application, ⚙️ Config, ✓ Preflight, 🚀 Deployment, 🌐 Service, etc.)
+- **All manifest files** organized by installation method
+- **Intelligent categorization** of manifests:
+  - **Shared Install Config** - Files used across all install methods (Helm, KOTS, Embedded Cluster)
+  - **Helm Install** - Files specific to native Helm installations
+  - **KOTS Install** - Files specific to KOTS and Embedded Cluster installations
+  - Alphabetical sorting within each category
+- **Visual kind badges** showing the resource type and install context
 - **Lint status** for each file (errors, warnings, info)
-- **Time since last check** with human-readable time ago (e.g., "5m ago")
 - **Detailed tooltips** showing:
-  - File path
-  - Kubernetes/KOTS kind
-  - Description of the resource type
+  - Installation method context (Shared, Helm, KOTS)
+  - Resource kind and description
   - API version
-  - Last linted timestamp
+  - File path
 - **Quick actions**:
   - **Lint All** button (▶️) to manually lint all manifests
   - **Refresh** button (🔄) to update the view
@@ -61,29 +60,25 @@ Access via the **"📊 Dashboard"** button in the Actions panel or command palet
 - **Beautiful, responsive UI** that adapts to VS Code themes
 - **Hover effects** and visual status indicators
 
-For more details, see [CLUSTER_RESOURCES_FEATURE.md](CLUSTER_RESOURCES_FEATURE.md) and [CLUSTER_RESOURCES_QUICKSTART.md](CLUSTER_RESOURCES_QUICKSTART.md)
-
 #### Supported Manifest Types
 
-The extension recognizes and properly orders these manifest types:
+The extension recognizes and categorizes these manifest types by installation method:
 
-**Replicated/KOTS Manifests:**
-- Application (kots.io/v1beta1)
-- Config (kots.io/v1beta1)
-- Preflight (troubleshoot.sh/v1beta2)
-- Analyzer (troubleshoot.sh/v1beta2)
-- SupportBundle (troubleshoot.sh/v1beta2)
-- HelmChart (kots.io/v1beta1)
-- Backup (velero.io/v1)
+**Shared Install Config** (used across multiple install methods):
+- Config (kots.io/v1beta1) - Customer configuration screen
+- Application (kots.io/v1beta1) - Replicated Application custom resource
+- Application (app.k8s.io/v1beta1) - Kubernetes SIG Application
+- SupportBundle (troubleshoot.sh/v1beta2) - Troubleshooting data collection
+- Preflight (troubleshoot.sh/v1beta2) - Pre-installation checks
+- Analyzer (troubleshoot.sh/v1beta2) - Analysis rules
 
-**Kubernetes Resources:**
-- Deployments, Services, StatefulSets, DaemonSets
-- Jobs, CronJobs
-- ConfigMaps, Secrets
-- PersistentVolumes, PersistentVolumeClaims
-- Ingress, NetworkPolicy
-- ServiceAccounts, Roles, RoleBindings
-- And all other standard Kubernetes resources
+**Helm Install:**
+- Chart - HelmChart specification for native Helm deployments
+
+**KOTS Install** (Embedded Cluster & existing cluster):
+- HelmChart (kots.io/v1beta1) - HelmChart custom resource telling KOTS how to deploy
+- Config (embedded-cluster.io) - Embedded Cluster configuration
+- Standard Kubernetes resources (Deployments, Services, ConfigMaps, Secrets, etc.)
 
 ### Automatic Linting
 
