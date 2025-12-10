@@ -1,5 +1,3 @@
-// The module 'vscode' contains the VS Code extensibility API	
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import * as path from 'path/posix';
 import { ManifestsViewProvider } from './views/manifestsView';
@@ -7,59 +5,48 @@ import { DevActionsViewProvider } from './views/devActionsView';
 import { CLIService } from './services/cliService';
 import { ClusterDashboardPanel } from './views/clusterDashboardView';
 import { LintService } from './services/lintService';
+import { registerCommands, withProgress, getManifestsPath } from './utils/commandUtils';
 
-
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+    console.log('Replicated extension activated');
+    
+    const diagnosticCollection = vscode.languages.createDiagnosticCollection('replicated');
+    const cliService = CLIService.getInstance();
+    const lintService = new LintService();
+    let enableOnSave = false;
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "replicated" is now active!');
-	let diagnosticCollection = vscode.languages.createDiagnosticCollection("replicated");
-	let enableOnSave = false;
+    // Register dev actions view
+    const devActionsViewProvider = new DevActionsViewProvider(context.extensionUri);
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            DevActionsViewProvider.viewType,
+            devActionsViewProvider
+        )
+    );
 
-	// Create and register the dev actions view provider
-	console.log('Registering DevActionsViewProvider for view:', DevActionsViewProvider.viewType);
-	const devActionsViewProvider = new DevActionsViewProvider(context.extensionUri);
-	const registration = vscode.window.registerWebviewViewProvider(
-		DevActionsViewProvider.viewType,
-		devActionsViewProvider
-	);
-	context.subscriptions.push(registration);
-	console.log('DevActionsViewProvider registered successfully');
+    // Register manifests tree view
+    const manifestsViewProvider = new ManifestsViewProvider(diagnosticCollection);
+    const treeView = vscode.window.createTreeView('replicatedManifests', {
+        treeDataProvider: manifestsViewProvider,
+        showCollapseAll: false
+    });
 
-	// Create and register the manifests tree view provider
-	const manifestsViewProvider = new ManifestsViewProvider(diagnosticCollection);
-	const treeView = vscode.window.createTreeView('replicatedManifests', {
-		treeDataProvider: manifestsViewProvider,
-		showCollapseAll: false
-	});
+    // Update tree view title based on workspace name
+    const updateTreeViewTitle = () => {
+        const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name;
+        if (workspaceName) {
+            treeView.title = workspaceName;
+        }
+    };
+    updateTreeViewTitle();
 
-	// Set dynamic title based on workspace name
-	function updateTreeViewTitle() {
-		const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name;
-		if (workspaceName) {
-			treeView.title = workspaceName;
-		}
-	}
-	updateTreeViewTitle();
+    context.subscriptions.push(
+        treeView,
+        vscode.workspace.onDidChangeWorkspaceFolders(updateTreeViewTitle)
+    );
 
-	// Update title when workspace changes
-	context.subscriptions.push(
-		vscode.workspace.onDidChangeWorkspaceFolders(() => {
-			updateTreeViewTitle();
-		})
-	);
-
-	// Check CLI status and update context
-	const cliService = CLIService.getInstance();
-	const lintService = new LintService();
-	
-	async function updateCLIContext() {
-		await devActionsViewProvider.updateCLIStatus();
-	}
-	updateCLIContext();
+    // Initialize CLI status
+    devActionsViewProvider.updateCLIStatus();
 
 	let d1 = vscode.commands.registerCommand('replicated.lint.enable', () => {
 		diagnosticCollection.clear();
@@ -161,14 +148,14 @@ export function activate(context: vscode.ExtensionContext) {
 	let d9 = vscode.commands.registerCommand('replicated.installCLI', async () => {
 		const installed = await cliService.installCLI();
 		if (installed) {
-			await updateCLIContext();
+			await devActionsViewProvider.updateCLIStatus();
 		}
 	});
 
 	// Check CLI status
 	let d10 = vscode.commands.registerCommand('replicated.checkCLI', async () => {
 		cliService.clearCache();
-		await updateCLIContext();
+		await devActionsViewProvider.updateCLIStatus();
 		const status = await cliService.checkCLIStatus();
 		
 		if (status.installed) {
@@ -214,8 +201,7 @@ export function activate(context: vscode.ExtensionContext) {
 		ClusterDashboardPanel.createOrShow(context.extensionUri);
 	});
 
-	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, treeView);
+	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13);
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}

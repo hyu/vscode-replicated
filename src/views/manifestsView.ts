@@ -4,10 +4,17 @@ import * as path from 'path';
 import * as yaml from 'yaml';
 import { LintStatus, ManifestInfo } from '../models/types';
 import { ManifestItem } from '../models/manifestItem';
+import { 
+    CATEGORY_CONFIGS, 
+    categorizeByInstallMethod, 
+    getKindDescription, 
+    getIconForKind,
+    InstallMethod
+} from '../utils/manifestUtils';
 
 /**
- * File decoration provider for manifest files
- * Shows an info badge for unmodified files
+ * File decoration provider that shows EM SPACE badge for unmodified files
+ * Maintains alignment with git's "M" decoration without showing visible characters
  */
 class ManifestDecorationProvider implements vscode.FileDecorationProvider {
     private _onDidChangeFileDecorations = new vscode.EventEmitter<vscode.Uri | vscode.Uri[]>();
@@ -27,67 +34,22 @@ class ManifestDecorationProvider implements vscode.FileDecorationProvider {
     provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
         const info = this.fileInfo.get(uri.fsPath);
         
-        // When file is modified, return undefined so only git's "M" decoration shows
+        // Only show decoration for unmodified files to maintain alignment
         if (!info || info.isModified) {
             return undefined;
         }
 
-        // Show EM SPACE (U+2003) badge for unmodified files to match the width of 'M' (git modified decoration)
-        // This maintains alignment when files are not modified, without showing a visible character
+        // EM SPACE matches width of 'M' in monospace fonts
         return {
-            badge: '\u2003', // EM SPACE - same width as M in monospace fonts
+            badge: '\u2003',
             tooltip: `Kind: ${info.kind}`
         };
     }
 }
 
 /**
- * Category configuration for install methods
- */
-interface CategoryConfig {
-    id: 'shared' | 'embedded-cluster' | 'kots' | 'helm';
-    title: string;
-    icon: string;
-    tooltip: string;
-    separator?: boolean;
-}
-
-/**
- * Category configurations
- */
-const CATEGORY_CONFIGS: CategoryConfig[] = [
-    {
-        id: 'shared',
-        title: 'Replicated Platform',
-        icon: 'settings-gear',
-        tooltip: 'Core configuration files for Replicated deployments'
-    },
-    {
-        id: 'embedded-cluster',
-        title: 'Embedded Cluster',
-        icon: 'package',
-        tooltip: 'Embedded Cluster (EC) is an install method that installs an embedded cluster, then installs your application.\nFor customer environments with NO existing Kubernetes, like Linux VM.',
-        separator: true  // Separator goes BEFORE this category
-    },
-    {
-        id: 'kots',
-        title: 'KOTS',
-        icon: 'server-environment',
-        tooltip: 'KOTS (Kubernetes Off-The-Shelf) is an install method that installs an embedded cluster, then installs your application.\nFor customer environments with NO existing Kubernetes, like Linux VM.',
-        separator: true  // Separator goes BEFORE this category
-    },
-    {
-        id: 'helm',
-        title: 'Helm CLI',
-        icon: 'symbol-method',
-        tooltip: 'Helm CLI is a popular install method for customers with existing Kubernetes clusters.',
-        separator: true  // Separator goes BEFORE this category
-    }
-];
-
-/**
  * Tree data provider for the Manifests view
- * Displays project manifest files organized by type (Replicated vs Kubernetes resources)
+ * Organizes manifest files by install method (Shared, Embedded Cluster, KOTS, Helm)
  */
 export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<ManifestItem | undefined | void> = new vscode.EventEmitter<ManifestItem | undefined | void>();
@@ -205,7 +167,6 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     }
 
     private getOrganizedManifests(manifestPath: string): ManifestItem[] {
-        // Collect all manifest files recursively
         const allFiles = this.collectAllManifestFiles(manifestPath, manifestPath);
         
         if (allFiles.length === 0) {
@@ -213,62 +174,47 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         }
 
         // Categorize files by install method
-        const unidentified: ManifestItem[] = [];
-        const sharedConfig: ManifestItem[] = [];
-        const embeddedCluster: ManifestItem[] = [];
-        const kotsInstall: ManifestItem[] = [];
-        const helmInstall: ManifestItem[] = [];
+        const categorizedFiles = new Map<InstallMethod, ManifestItem[]>();
+        categorizedFiles.set('unidentified', []);
+        categorizedFiles.set('shared', []);
+        categorizedFiles.set('embedded-cluster', []);
+        categorizedFiles.set('kots', []);
+        categorizedFiles.set('helm', []);
         
         for (const fileItem of allFiles) {
-            const category = this.categorizeByInstallMethod(fileItem);
+            const manifestInfo = this.parseManifestKind(fileItem.filePath || '');
+            const category = categorizeByInstallMethod(
+                manifestInfo.kind,
+                manifestInfo.apiVersion,
+                fileItem.label.toLowerCase()
+            );
             
-            switch (category) {
-                case 'unidentified':
-                    unidentified.push(fileItem);
-                    break;
-                case 'shared':
-                    sharedConfig.push(fileItem);
-                    break;
-                case 'embedded-cluster':
-                    embeddedCluster.push(fileItem);
-                    break;
-                case 'kots':
-                    kotsInstall.push(fileItem);
-                    break;
-                case 'helm':
-                    helmInstall.push(fileItem);
-                    break;
-            }
+            categorizedFiles.get(category)!.push(fileItem);
         }
 
         const categories: ManifestItem[] = [];
 
-        // Show unidentified files at the top level (not in a category)
+        // Show unidentified files at the top level
+        const unidentified = categorizedFiles.get('unidentified')!;
         if (unidentified.length > 0) {
             categories.push(...unidentified);
         }
 
-        // Create categories dynamically from config
+        // Create categories dynamically
         for (const config of CATEGORY_CONFIGS) {
-            const files = config.id === 'shared' ? sharedConfig :
-                         config.id === 'embedded-cluster' ? embeddedCluster :
-                         config.id === 'kots' ? kotsInstall :
-                         helmInstall;
+            const files = categorizedFiles.get(config.id)!;
             
-            // Add separator BEFORE this category if specified
             if (config.separator) {
                 categories.push(this.createSeparator());
             }
             
-            // Create category item
-            const categoryItem = this.createCategoryItem(
+            categories.push(this.createCategoryItem(
                 config.title,
                 config.icon,
                 config.tooltip,
                 files,
                 manifestPath
-            );
-            categories.push(categoryItem);
+            ));
         }
 
         return categories;
@@ -306,127 +252,6 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         return categoryItem;
     }
 
-    private categorizeByInstallMethod(fileItem: ManifestItem): 'unidentified' | 'shared' | 'embedded-cluster' | 'kots' | 'helm' {
-        const fileName = fileItem.label.toLowerCase();
-        const kind = fileItem.kind;
-        
-        // Check if this file can be identified by our system
-        // A file is unidentified if we don't have a description for it
-        const manifestInfo = this.parseManifestKind(fileItem.filePath || '');
-        const canIdentify = this.canIdentifyManifest(manifestInfo.apiVersion, manifestInfo.kind, fileName);
-        
-        if (!canIdentify) {
-            return 'unidentified';
-        }
-        
-        // Check Embedded Cluster FIRST (more specific) before generic Config check
-        if (fileName.includes('embedded-cluster')) {
-            return 'embedded-cluster';
-        }
-        
-        if (manifestInfo.apiVersion === 'embeddedcluster.replicated.com/v1beta1') {
-            return 'embedded-cluster';
-        }
-        
-        // THEN check shared config files (more generic - used across multiple install methods)
-        if (kind === 'Config' || fileName === 'config.yaml' || fileName === 'config.yml') {
-            return 'shared';
-        }
-        
-        if (kind === 'Application' && fileName.includes('replicated-app')) {
-            return 'shared';
-        }
-        
-        if (fileName.includes('k8s-app')) {
-            return 'shared';
-        }
-        
-        if (kind === 'SupportBundle' || fileName.includes('support-bundle')) {
-            return 'shared';
-        }
-        
-        // Helm-specific files (pure Helm charts, not HelmChart CRs)
-        if (fileName.includes('chart') && !fileName.includes('helmchart') && kind !== 'HelmChart') {
-            return 'helm';
-        }
-        
-        // Files that look like plain HelmChart specs without being HelmChart CRs
-        // Check for files like han.yaml that are Chart resources
-        if (kind === 'Chart' || (fileName.endsWith('.yaml') && !fileName.includes('replicated') && !fileName.includes('k8s') && !fileName.includes('embedded') && !fileName.includes('config') && !fileName.includes('support') && kind === undefined)) {
-            // Ambiguous - could be Helm or other. Let's check apiVersion if available
-            // For now, assume these are Helm unless proven otherwise
-            return 'helm';
-        }
-        
-        // KOTS-specific files
-        if (kind === 'HelmChart') {
-            return 'kots';
-        }
-        
-        // Default to shared for other known Replicated kinds
-        if (this.isKnownReplicatedKind(kind)) {
-            return 'shared';
-        }
-        
-        // All other Kubernetes resources go to KOTS
-        return 'kots';
-    }
-
-    private canIdentifyManifest(apiVersion: string | undefined, kind: string | undefined, fileName: string): boolean {
-        // Check if we have a description for this manifest
-        const description = this.getKindDescription(apiVersion, kind || '', fileName);
-        return description !== undefined;
-    }
-
-    private isKnownReplicatedKind(kind: string | undefined): boolean {
-        if (!kind) {
-            return false;
-        }
-        
-        const replicatedKinds = [
-            'Application',
-            'Config',
-            'Preflight',
-            'Analyzer',
-            'SupportBundle',
-            'HelmChart',
-            'Backup',
-            'Troubleshoot',
-            'Redactor'
-        ];
-        
-        return replicatedKinds.includes(kind);
-    }
-
-    private getIconForKind(kind: string | undefined): string {
-        if (!kind) {
-            return 'code';
-        }
-        
-        // Application / Runtime resources (what actually runs)
-        const applicationKinds = [
-            'Deployment',
-            'Service',
-            'ConfigMap',
-            'Secret',
-            'StatefulSet',
-            'Ingress',
-            'PersistentVolumeClaim',
-            'Chart',
-            'HelmChart'
-        ];
-        
-        if (applicationKinds.includes(kind)) {
-            return 'package';
-        }
-        
-        // Default for all other kinds (Admin Console, Troubleshooting, etc.)
-        return 'code';
-    }
-
-    /**
-     * Creates a visual separator for the tree view
-     */
     private createSeparator(): ManifestItem {
         const separator = new ManifestItem(
             '┄┄┄┄┄┄┄┄┄┄┄',
@@ -472,18 +297,13 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
 
     private createFileItem(fullPath: string, basePath: string, fileName: string): ManifestItem {
         const lintStatus = this.lintStatuses.get(fullPath);
-        
-        // Parse YAML to detect kind
         const manifestInfo = this.parseManifestKind(fullPath);
-        
-        // Check if file is modified in git
         const isModified = this.isFileModified(fullPath);
         
-        // Register file with decoration provider
         this.decorationProvider.setFileInfo(fullPath, manifestInfo.kind, isModified);
         
         let description = '';
-        let iconPath = this.getIconForKind(manifestInfo.kind);
+        let iconPath = getIconForKind(manifestInfo.kind);
         
         if (lintStatus && lintStatus.hasIssues) {
             const parts: string[] = [];
@@ -504,12 +324,8 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
                 }
             }
             description = parts.join(', ').trim();
-        } else {
-            // No issues - use icon based on kind
-            // Show kind in description for clarity (right-aligned)
-            if (manifestInfo.kind) {
-                description = manifestInfo.kind.trim();
-            }
+        } else if (manifestInfo.kind) {
+            description = manifestInfo.kind.trim();
         }
         
         const item = new ManifestItem(
@@ -529,86 +345,24 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             arguments: [fullPath]
         };
         
-        // Set resourceUri so git decorations appear
         item.resourceUri = vscode.Uri.file(fullPath);
         
-        // Build concise tooltip with description and API info
+        // Build tooltip
         const tooltipParts: string[] = [];
-        
         if (manifestInfo.kind) {
-            // Add description based on apiVersion + kind
-            const kindDescription = this.getKindDescription(manifestInfo.apiVersion, manifestInfo.kind, fileName);
+            const kindDescription = getKindDescription(manifestInfo.apiVersion, manifestInfo.kind, fileName);
             if (kindDescription) {
                 tooltipParts.push(kindDescription);
             }
         }
-        
         if (manifestInfo.apiVersion) {
             tooltipParts.push(`API Version: ${manifestInfo.apiVersion}`);
         }
-        
-        // Join with double newline for better readability
         item.tooltip = tooltipParts.join('\n\n');
         
-        // Add inline action button for linting
         item.contextValue = 'manifestFile';
         
         return item;
-    }
-
-    private getKindDescription(apiVersion: string | undefined, kind: string, fileName: string): string | undefined {
-        // Use apiVersion + kind together for accurate identification
-        const key = apiVersion && kind ? `${apiVersion}/${kind}` : undefined;
-        
-        // Map of apiVersion/kind to description
-        const descriptions = new Map<string, string>([
-            // Replicated KOTS Resources
-            ['kots.io/v1beta1/Config', 'Define the config screen for your customers to set their org\'s unique install values.\ne.g., database URLs, API keys, feature flags…'],
-            ['kots.io/v1beta1/Application', 'Customize Admin Console for your customers with your custom branding, app status indicators, port forwarding, release notes…'],
-            ['kots.io/v1beta2/HelmChart', 'Specify how KOTS deploys Helm charts to your customer\'s cluster (KOTS), or define your chart specification (Helm)'],
-            ['kots.io/v1beta1/ConfigValues', 'Set default config values for customers doing automated / headless installs without Admin Console UI. e.g., for CI/CD pipelines'],
-            ['kots.io/v1beta1/LintConfig', 'Customize release linter rules to validate manifests before deploying new releases to your customers'],
-            
-            // Embedded Cluster
-            ['embeddedcluster.replicated.com/v1beta1/Config', 'Configure the embedded Kubernetes cluster your customers will run in their infrastructure.\ne.g., cluster version, node settings, requirements…'],
-            
-            // Kubernetes Application
-            ['app.k8s.io/v1beta1/Application', 'Adds buttons and links to the Replicated Admin Console dashboard'],
-            
-            // Troubleshoot Resources
-            ['troubleshoot.sh/v1beta2/Preflight', 'Define validation checks to run in your customer\'s environment before actual installation, to verify their system meets requirements.\ne.g., memory, disk, permissions…'],
-            ['troubleshoot.sh/v1beta2/SupportBundle', 'Specify the diagnostic data to collect from your customer\'s environment when they need support.\ne.g., application logs, pod status, resource states, custom collectors…'],
-            ['troubleshoot.sh/v1beta2/Redactor', 'Define patterns to automatically remove your customer\'s sensitive info from support bundles they send you.\ne.g., passwords, API tokens, encryption keys'],
-            ['troubleshoot.sh/v1beta2/Analyzer', 'Define custom analysis rules for support bundles to automatically diagnose common issues in your customer\'s environment'],
-            
-            // Standard Kubernetes Resources (expanded for K8s beginners)
-            ['apps/v1/Deployment', 'Manage your application pods in your customer\'s cluster\ne.g., define rolling updates, scaling behavior, ensure desired replicas run…'],
-            ['v1/Service', 'Provide a stable network endpoint for your app in your customer\'s cluster. Works like a load balancer routing traffic to your pods.'],
-            ['v1/ConfigMap', 'Store non-sensitive configuration data your app needs at runtime in your customer\'s cluster.\ne.g., settings, feature flags, config files for pods…)'],
-            ['v1/Secret', 'Store sensitive data your application needs in your customer\'s cluster. Secrets are base64 encoded with restricted access controls.\ne.g., passwords, API keys, certificates…'],
-            ['apps/v1/StatefulSet', 'Manage stateful applications in your customer\'s cluster.\ne.g., databases and queues that need persistent identity, stable network IDs, ordered deployment…'],
-            ['networking.k8s.io/v1/Ingress', 'Define how external HTTP/HTTPS traffic reaches your application in your customer\'s cluster\ne.g., URL paths, domains, TLS certificates…'],
-            ['v1/PersistentVolumeClaim', 'Request persistent storage for your app in your customer\'s cluster. Ensure your data survives pod restarts and rescheduling.']
-        ]);
-        
-        // Primary: Check apiVersion + kind together
-        if (key) {
-            const description = descriptions.get(key);
-            if (description) {
-                return description;
-            }
-        }
-        
-        // Secondary: Fallback to file name patterns for cases where apiVersion might be missing
-        if (fileName.includes('embedded-cluster') && kind === 'Config') {
-            return 'Configure the embedded Kubernetes cluster your customers will run in their infrastructure - cluster version, node settings, and requirements';
-        }
-        
-        if (fileName.includes('k8s-app') && kind === 'Application') {
-            return 'Add custom buttons and links to your customer\'s Kubernetes dashboard (typically excluded from KOTS installations with kots.io/exclude annotation)';
-        }
-        
-        return undefined;
     }
 
     private getDirectoryChildren(dirPath: string, basePath: string): ManifestItem[] {
@@ -667,12 +421,10 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             const content = fs.readFileSync(filePath, 'utf8');
             const docs = yaml.parseAllDocuments(content);
             
-            // Get the first document's kind
             if (docs.length > 0 && docs[0].toJS()) {
                 const firstDoc = docs[0].toJS() as any;
                 
-                // Special handling for Support Bundle Secrets
-                // Check if this is a Secret with the troubleshoot.sh/kind: support-bundle label
+                // Support Bundle Secrets have troubleshoot.sh/kind label
                 if (firstDoc.kind === 'Secret' && 
                     firstDoc.metadata?.labels?.['troubleshoot.sh/kind'] === 'support-bundle') {
                     return {
@@ -687,7 +439,6 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
                 };
             }
         } catch (error) {
-            // If parsing fails, just return empty
             console.error(`Error parsing YAML ${filePath}:`, error);
         }
         

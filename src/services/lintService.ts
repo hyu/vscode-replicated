@@ -4,17 +4,14 @@ import * as path from 'path';
 import got, { PlainResponse } from 'got';
 import { promisify } from 'node:util';
 import stream from 'node:stream';
+import { getDiagnosticSeverity, createDiagnostic, createDefaultDiagnostic } from '../utils/diagnosticUtils';
 
 /**
- * Service for linting Replicated manifest files
- * Sends manifests to Replicated's lint API and processes results
+ * Service for linting Replicated manifest files via the Replicated lint API
  */
 export class LintService {
     private readonly LINT_API_URL = 'https://lint.replicated.com/v1/lint';
 
-    /**
-     * Lint all manifests in a folder
-     */
     async lintFolder(folderPath: string, diagnosticCollection: vscode.DiagnosticCollection): Promise<void> {
         return new Promise((resolve, reject) => {
             const pipeline = promisify(stream.pipeline);
@@ -52,91 +49,58 @@ export class LintService {
         });
     }
 
-    /**
-     * Process lint results and update diagnostics
-     */
     private processlintResults(lintResults: any, diagnosticCollection: vscode.DiagnosticCollection): void {
-        let map = new Map();
+        const fileToExpressionsMap = this.groupLintExpressionsByFile(lintResults.lintExpressions);
 
-        lintResults.lintExpressions.forEach(function (lintExpression: { path: string; }) {
-            if (map.has(lintExpression.path)) {
-                var exps = map.get(lintExpression.path);
-                exps.push(lintExpression);
-                map.set(lintExpression.path, exps);
-            } else {
-                map.set(lintExpression.path, [lintExpression]);
-            }
-        });
-
-        for (let key of map.keys()) {
-            let diagnostics: vscode.Diagnostic[] = [];
-            for (let lexpr of map.get(key)) {
-                // Check if positions exists and is iterable
-                if (lexpr.positions && Array.isArray(lexpr.positions)) {
-                    for (let pos of lexpr.positions) {
-                        // Create a range that highlights the entire line or uses specific columns if available
-                        let startLine = pos.start.line - 1;
-                        let startCol = pos.start.position || 0;
-                        let endLine = pos.end?.line ? pos.end.line - 1 : startLine;
-                        let endCol = pos.end?.position || Number.MAX_SAFE_INTEGER;
-                        
-                        let range = new vscode.Range(
-                            new vscode.Position(startLine, startCol),
-                            new vscode.Position(endLine, endCol)
-                        );
-                        
-                        let message = lexpr.message;
-                        let severity = vscode.DiagnosticSeverity.Warning;
-                        if (lexpr.type === "info") {
-                            severity = vscode.DiagnosticSeverity.Information;
-                        }
-                        if (lexpr.type === "error") {
-                            severity = vscode.DiagnosticSeverity.Error;
-                        }
-                        
-                        let diagnostic = new vscode.Diagnostic(range, message, severity);
-                        diagnostic.source = "Replicated";
-                        diagnostics.push(diagnostic);
-                    }
-                } else {
-                    // If no positions, create a diagnostic at line 0
-                    let range = new vscode.Range(
-                        new vscode.Position(0, 0),
-                        new vscode.Position(0, Number.MAX_SAFE_INTEGER)
-                    );
-                    let message = lexpr.message;
-                    let severity = vscode.DiagnosticSeverity.Warning;
-                    if (lexpr.type === "info") {
-                        severity = vscode.DiagnosticSeverity.Information;
-                    }
-                    if (lexpr.type === "error") {
-                        severity = vscode.DiagnosticSeverity.Error;
-                    }
-                    
-                    let diagnostic = new vscode.Diagnostic(range, message, severity);
-                    diagnostic.source = "Replicated";
-                    diagnostics.push(diagnostic);
-                }
-            }
-            diagnosticCollection.set(vscode.Uri.file(key), diagnostics);
+        for (const [filePath, expressions] of fileToExpressionsMap.entries()) {
+            const diagnostics = expressions.flatMap(expr => this.createDiagnosticsFromExpression(expr));
+            diagnosticCollection.set(vscode.Uri.file(filePath), diagnostics);
         }
     }
 
-    /**
-     * Lint all manifests in workspace folders
-     */
-    async lintWorkspace(diagnosticCollection: vscode.DiagnosticCollection): Promise<void> {
-        if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
-            const promises = vscode.workspace.workspaceFolders.map(async function (folder) {
-                const absolutePath = folder.uri.path;
-                const manifestFolder = vscode.workspace.getConfiguration('replicated').get("manifestsFolder");
-                const manifestPath = path.join(absolutePath, String(manifestFolder));
-                
-                return new LintService().lintFolder(manifestPath, diagnosticCollection);
-            });
-            
-            await Promise.all(promises);
+    private groupLintExpressionsByFile(lintExpressions: any[]): Map<string, any[]> {
+        const map = new Map<string, any[]>();
+        
+        for (const expression of lintExpressions) {
+            const existing = map.get(expression.path) || [];
+            existing.push(expression);
+            map.set(expression.path, existing);
         }
+        
+        return map;
+    }
+
+    private createDiagnosticsFromExpression(expression: any): vscode.Diagnostic[] {
+        const severity = getDiagnosticSeverity(expression.type);
+        
+        if (!expression.positions || !Array.isArray(expression.positions)) {
+            return [createDefaultDiagnostic(expression.message, severity)];
+        }
+        
+        return expression.positions.map((pos: any) => {
+            const startLine = pos.start.line - 1;
+            const startCol = pos.start.position || 0;
+            const endLine = pos.end?.line ? pos.end.line - 1 : startLine;
+            const endCol = pos.end?.position || Number.MAX_SAFE_INTEGER;
+            
+            return createDiagnostic(startLine, startCol, endLine, endCol, expression.message, severity);
+        });
+    }
+
+    async lintWorkspace(diagnosticCollection: vscode.DiagnosticCollection): Promise<void> {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+            return;
+        }
+
+        const manifestFolder = vscode.workspace.getConfiguration('replicated').get<string>("manifestsFolder", "manifests");
+        
+        const lintPromises = folders.map(folder => {
+            const manifestPath = path.join(folder.uri.path, manifestFolder);
+            return this.lintFolder(manifestPath, diagnosticCollection);
+        });
+        
+        await Promise.all(lintPromises);
     }
 }
 
