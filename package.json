@@ -17,7 +17,6 @@
   },
   "activationEvents": [
     "onStartupFinished",
-    "onCommand:replicated.lint.enable",
     "onView:replicatedManifests",
     "onView:replicatedActions"
   ],
@@ -47,26 +46,9 @@
     },
     "commands": [
       {
-        "command": "replicated.lint.enable",
-        "title": "Replicated: Enable Lint"
-      },
-      {
-        "command": "replicated.lint.disable",
-        "title": "Replicated: Disable Lint"
-      },
-      {
-        "command": "replicated.toggleAutoLint",
-        "title": "Replicated: Toggle Auto-lint on Save"
-      },
-      {
         "command": "replicated.lintAll",
         "title": "Replicated: Lint All Manifests",
         "icon": "$(play)"
-      },
-      {
-        "command": "replicated.lintFile",
-        "title": "Lint File",
-        "icon": "$(pass)"
       },
       {
         "command": "replicated.refreshManifests",
@@ -74,44 +56,21 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "replicated.openManifest",
-        "title": "Open Manifest"
+        "command": "replicated.lintFile",
+        "title": "Lint File",
+        "icon": "$(check)"
       },
       {
         "command": "replicated.openDocs",
         "title": "Learn More",
         "icon": "$(info)"
-      },
-      {
-        "command": "replicated.testInEnvironment",
-        "title": "Replicated: Test in Environment",
-        "icon": "$(rocket)"
-      },
-      {
-        "command": "replicated.installCLI",
-        "title": "Replicated: Install CLI",
-        "icon": "$(cloud-download)"
-      },
-      {
-        "command": "replicated.checkCLI",
-        "title": "Replicated: Check CLI Status",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "replicated.testInEnvironmentDirect",
-        "title": "Test in Environment (Direct)",
-        "icon": "$(rocket)"
-      },
-      {
-        "command": "replicated.showClusterResources",
-        "title": "Replicated: Show Cluster Resources",
-        "icon": "$(server)"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "replicated.lintAll",
+          
           "when": "view == replicatedManifests",
           "group": "navigation@1",
           "icon": "$(play)"
@@ -160,7 +119,8 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && npm run copy-resources",
+    "copy-resources": "node scripts/copyResources.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",

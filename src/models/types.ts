@@ -6,6 +6,8 @@ export interface CLIStatus {
     installed: boolean;
     version?: string;
     error?: string;
+    updateAvailable?: boolean;
+    latestVersion?: string;
 }
 
 export interface LintStatus {

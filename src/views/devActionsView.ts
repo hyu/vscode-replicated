@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { CLIService } from '../services/cliService';
 
 /**
@@ -60,6 +62,13 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                 case 'openDashboard':
                     vscode.commands.executeCommand('replicated.showClusterResources');
                     break;
+                case 'copyText':
+                    if (data.text) {
+                        vscode.env.clipboard.writeText(data.text).then(() => {
+                            vscode.window.showInformationMessage(`Copied to clipboard: ${data.text}`);
+                        });
+                    }
+                    break;
             }
         });
     }
@@ -85,294 +94,42 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private _getHtmlForWebview(webview: vscode.Webview) {
+    private _getHtmlForWebview(webview: vscode.Webview): string {
+        // Get the path to the HTML template file
+        // Try multiple possible locations to handle both development and packaged scenarios
+        const possiblePaths = [
+            // Packaged extension: resources folder at extension root
+            path.join(this._extensionUri.fsPath, 'resources', 'devActionsView.html'),
+            // Development: resources folder in src directory
+            path.join(this._extensionUri.fsPath, 'src', 'resources', 'devActionsView.html'),
+            // Alternative: relative to compiled output
+            path.join(__dirname, '..', 'resources', 'devActionsView.html'),
+        ];
+        
+        for (const htmlPath of possiblePaths) {
+            try {
+                if (fs.existsSync(htmlPath)) {
+                    const htmlContent = fs.readFileSync(htmlPath, 'utf-8');
+                    return htmlContent;
+                }
+            } catch (error) {
+                // Continue to next path
+                continue;
+            }
+        }
+        
+        // If all paths failed, log error and return fallback
+        console.error('Failed to load HTML template from any of these paths:', possiblePaths);
         return `<!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                body {
-                    padding: 16px 12px;
-                    font-family: var(--vscode-font-family);
-                    font-size: var(--vscode-font-size);
-                    color: var(--vscode-foreground);
-                    line-height: 1.5;
-                }
-                .container {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 12px;
-                }
-                
-                /* Checkbox */
-                .checkbox-container {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 4px 0;
-                    cursor: pointer;
-                    user-select: none;
-                }
-                .checkbox-container:hover {
-                    opacity: 0.8;
-                }
-                .checkbox {
-                    width: 16px;
-                    height: 16px;
-                    border: 1px solid var(--vscode-checkbox-border);
-                    background-color: var(--vscode-checkbox-background);
-                    border-radius: 3px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    flex-shrink: 0;
-                }
-                .checkbox.checked {
-                    background-color: var(--vscode-checkbox-background);
-                    border-color: var(--vscode-focusBorder);
-                }
-                .checkbox.checked::after {
-                    content: '✓';
-                    color: var(--vscode-checkbox-foreground);
-                    font-size: 12px;
-                    font-weight: bold;
-                }
-                
-                /* Button with dropdown */
-                .button-group {
-                    position: relative;
-                }
-                .button-with-dropdown {
-                    display: flex;
-                    width: 100%;
-                    border-radius: 2px;
-                    overflow: hidden;
-                    border: 1px solid transparent;
-                }
-                .button-with-dropdown:hover {
-                    border-color: var(--vscode-button-hoverBackground);
-                }
-                .button-main {
-                    flex: 1;
-                    background-color: var(--vscode-button-background);
-                    color: var(--vscode-button-foreground);
-                    border: none;
-                    padding: 6px 12px;
-                    cursor: pointer;
-                    font-size: 13px;
-                    font-family: var(--vscode-font-family);
-                    text-align: left;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                }
-                .button-main:hover {
-                    background-color: var(--vscode-button-hoverBackground);
-                }
-                .button-dropdown {
-                    background-color: var(--vscode-button-background);
-                    color: var(--vscode-button-foreground);
-                    border: none;
-                    border-left: 1px solid rgba(255, 255, 255, 0.2);
-                    padding: 6px 8px;
-                    cursor: pointer;
-                    font-size: 11px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .button-dropdown:hover {
-                    background-color: var(--vscode-button-hoverBackground);
-                }
-                
-                .dropdown-menu {
-                    display: none;
-                    position: absolute;
-                    top: 100%;
-                    left: 0;
-                    right: 0;
-                    background-color: var(--vscode-dropdown-background);
-                    border: 1px solid var(--vscode-dropdown-border);
-                    border-radius: 2px;
-                    margin-top: 2px;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-                    z-index: 1000;
-                    overflow: hidden;
-                }
-                .dropdown-menu.show {
-                    display: block;
-                }
-                .dropdown-item {
-                    padding: 8px 12px;
-                    cursor: pointer;
-                    font-size: 13px;
-                    background: transparent;
-                    border: none;
-                    color: var(--vscode-dropdown-foreground);
-                    text-align: left;
-                    width: 100%;
-                }
-                .dropdown-item:hover {
-                    background-color: var(--vscode-list-hoverBackground);
-                }
-                
-                /* CLI Status */
-                .cli-status {
-                    margin-top: 8px;
-                    padding-top: 12px;
-                    border-top: 1px solid var(--vscode-panel-border);
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                }
-                .cli-info {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    font-size: 12px;
-                    color: var(--vscode-descriptionForeground);
-                }
-                .cli-icon {
-                    font-size: 14px;
-                }
-                .icon-button {
-                    background: transparent;
-                    border: none;
-                    color: var(--vscode-icon-foreground);
-                    cursor: pointer;
-                    padding: 4px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border-radius: 3px;
-                }
-                .icon-button:hover {
-                    background-color: var(--vscode-toolbar-hoverBackground);
-                }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <!-- Auto-lint checkbox -->
-                <div class="checkbox-container" onclick="toggleAutoLint()">
-                    <div class="checkbox" id="autoLintCheckbox"></div>
-                    <span>Auto-lint on save</span>
-                </div>
-                
-                <!-- Test in Environment button with dropdown -->
-                <div class="button-group">
-                    <div class="button-with-dropdown">
-                        <button class="button-main" onclick="testInEnvironment()">
-                            <span>🚀</span>
-                            <span>Test in Environment</span>
-                        </button>
-                        <button class="button-dropdown" onclick="toggleDropdown()">▼</button>
-                    </div>
-                    <div class="dropdown-menu" id="envDropdown">
-                        <button class="dropdown-item" onclick="testInEnvironment('development')">Development</button>
-                        <button class="dropdown-item" onclick="testInEnvironment('staging')">Staging</button>
-                        <button class="dropdown-item" onclick="testInEnvironment('production')">Production</button>
-                    </div>
-                </div>
-                
-                <!-- CLI Status -->
-                <div class="cli-status">
-                    <div class="cli-info">
-                        <span class="cli-icon" id="cliIcon">⏳</span>
-                        <span id="cliText">CLI: Checking...</span>
-                    </div>
-                    <button class="icon-button" id="cliAction" onclick="handleCLIAction()" title="Check for updates">
-                        <span id="cliActionIcon">↻</span>
-                    </button>
-                </div>
-            </div>
-
-            <script>
-                const vscode = acquireVsCodeApi();
-                let autoLintEnabled = false;
-                let cliInstalled = false;
-
-                function toggleAutoLint() {
-                    vscode.postMessage({ type: 'toggleAutoLint' });
-                }
-
-                function testInEnvironment(environment) {
-                    if (environment) {
-                        hideDropdown();
-                    }
-                    vscode.postMessage({ 
-                        type: 'testInEnvironment',
-                        environment: environment
-                    });
-                }
-
-                function toggleDropdown() {
-                    const dropdown = document.getElementById('envDropdown');
-                    dropdown.classList.toggle('show');
-                }
-
-                function hideDropdown() {
-                    const dropdown = document.getElementById('envDropdown');
-                    dropdown.classList.remove('show');
-                }
-
-                // Close dropdown when clicking outside
-                document.addEventListener('click', (e) => {
-                    const dropdown = document.getElementById('envDropdown');
-                    const buttonGroup = e.target.closest('.button-group');
-                    if (!buttonGroup && dropdown.classList.contains('show')) {
-                        hideDropdown();
-                    }
-                });
-
-                function handleCLIAction() {
-                    if (cliInstalled) {
-                        vscode.postMessage({ type: 'checkCLI' });
-                    } else {
-                        vscode.postMessage({ type: 'installCLI' });
-                    }
-                }
-
-                // Listen for status updates from extension
-                window.addEventListener('message', event => {
-                    const message = event.data;
-                    
-                    if (message.type === 'updateAutoLint') {
-                        autoLintEnabled = message.enabled;
-                        const checkbox = document.getElementById('autoLintCheckbox');
-                        if (autoLintEnabled) {
-                            checkbox.classList.add('checked');
-                        } else {
-                            checkbox.classList.remove('checked');
-                        }
-                    }
-                    
-                    if (message.type === 'updateCLI') {
-                        cliInstalled = message.installed;
-                        const cliIcon = document.getElementById('cliIcon');
-                        const cliText = document.getElementById('cliText');
-                        const cliActionIcon = document.getElementById('cliActionIcon');
-                        const cliAction = document.getElementById('cliAction');
-                        
-                        if (message.installed) {
-                            cliIcon.textContent = '✓';
-                            cliIcon.style.color = 'var(--vscode-testing-iconPassed)';
-                            cliText.textContent = \`CLI: \${message.version || 'installed'}\`;
-                            cliActionIcon.textContent = '↻';
-                            cliAction.title = 'Check for updates';
-                        } else {
-                            cliIcon.textContent = '⚠';
-                            cliIcon.style.color = 'var(--vscode-editorWarning-foreground)';
-                            cliText.textContent = 'CLI: Not installed';
-                            cliActionIcon.textContent = '↓';
-                            cliAction.title = 'Install CLI';
-                        }
-                    }
-                });
-            </script>
-        </body>
-        </html>`;
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Error</title>
+</head>
+<body>
+    <p>Error loading webview content. Please check the console for details.</p>
+</body>
+</html>`;
     }
 }
 

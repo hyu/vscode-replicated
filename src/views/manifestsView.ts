@@ -35,7 +35,7 @@ class GitPlaceholderDecorationProvider implements vscode.FileDecorationProvider 
 
     provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
         return this.filesNeedingPlaceholder.has(uri.fsPath)
-            ? { badge: ' ', tooltip: 'No changes' } // Em space (U+2003)
+            ? { badge: '\u2003', tooltip: 'No changes' }
             : undefined;
     }
 }
@@ -51,8 +51,10 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     private lintHasRun = false;
     private gitApi: any | undefined;
     private gitPlaceholderProvider: GitPlaceholderDecorationProvider;
+    private extensionUri: vscode.Uri;
 
-    constructor(private diagnosticCollection: vscode.DiagnosticCollection) {
+    constructor(private diagnosticCollection: vscode.DiagnosticCollection, extensionUri: vscode.Uri) {
+        this.extensionUri = extensionUri;
         this.gitPlaceholderProvider = new GitPlaceholderDecorationProvider();
         vscode.window.registerFileDecorationProvider(this.gitPlaceholderProvider);
 
@@ -210,6 +212,7 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             tree.push(this.createCategoryItem(
                 config.title,
                 config.icon,
+                config.customIconPath,
                 config.tooltip,
                 config.docsUrl,
                 categorizedFiles.get(config.id)!,
@@ -223,6 +226,7 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     private createCategoryItem(
         title: string,
         icon: string,
+        customIconPath: string | undefined,
         tooltip: string,
         docsUrl: string | undefined,
         files: ManifestItem[],
@@ -243,7 +247,13 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             manifestPath
         );
         
-        item.iconPath = new vscode.ThemeIcon(icon);
+        // Use custom icon path if provided, otherwise use theme icon
+        if (customIconPath) {
+            item.iconPath = vscode.Uri.joinPath(this.extensionUri, customIconPath);
+        } else {
+            item.iconPath = new vscode.ThemeIcon(icon);
+        }
+        
         item.tooltip = tooltip;
         item.children = files;
         

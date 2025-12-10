@@ -27,7 +27,7 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('✅ DevActionsViewProvider registered successfully');
 
     // Register manifests tree view
-    const manifestsViewProvider = new ManifestsViewProvider(diagnosticCollection);
+    const manifestsViewProvider = new ManifestsViewProvider(diagnosticCollection, context.extensionUri);
     const treeView = vscode.window.createTreeView('replicatedManifests', {
         treeDataProvider: manifestsViewProvider,
         showCollapseAll: false

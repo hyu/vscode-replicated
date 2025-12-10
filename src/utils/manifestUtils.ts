@@ -8,6 +8,7 @@ export interface CategoryConfig {
     id: InstallMethod;
     title: string;
     icon: string;
+    customIconPath?: string; // Path to custom SVG icon relative to extension root
     tooltip: string;
     docsUrl?: string;
     separator?: boolean;
@@ -28,6 +29,7 @@ export const CATEGORY_CONFIGS: CategoryConfig[] = [
         id: 'embedded-cluster',
         title: 'Embedded Cluster',
         icon: 'package',
+        customIconPath: 'img/k8s-red.svg', // Uses BRAND_COLORS.replicatedRed (#FF4856)
         tooltip: 'Embedded Cluster (EC) is an install method that installs an embedded cluster, then installs your application.\nFor customer environments with NO existing Kubernetes, like Linux VM.',
         docsUrl: 'https://docs.replicated.com/vendor/embedded-overview',
         separator: true
@@ -36,6 +38,7 @@ export const CATEGORY_CONFIGS: CategoryConfig[] = [
         id: 'kots',
         title: 'KOTS',
         icon: 'server-environment',
+        customIconPath: 'img/k8s-blue.svg', // Uses BRAND_COLORS.nebulaPurple (#6977FB)
         tooltip: 'KOTS (Kubernetes Off-The-Shelf) is an install method that installs your application in an existing Kubernetes cluster.\nProvides an Admin Console for managing installations.',
         docsUrl: 'https://docs.replicated.com/intro-kots',
         separator: true
@@ -44,6 +47,7 @@ export const CATEGORY_CONFIGS: CategoryConfig[] = [
         id: 'helm',
         title: 'Helm CLI',
         icon: 'symbol-method',
+        customIconPath: 'img/helm.svg',
         tooltip: 'Helm CLI is a popular install method for customers with existing Kubernetes clusters.',
         docsUrl: 'https://docs.replicated.com/vendor/install-with-helm',
         separator: true
