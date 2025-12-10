@@ -21,17 +21,14 @@ export class ManifestItem extends vscode.TreeItem {
         
         // Set icon based on type
         if (isDirectory) {
-            // Folders use folder icon
             this.iconPath = vscode.ThemeIcon.Folder;
         } else if (iconType === 'folder') {
-            // Category items
             this.iconPath = new vscode.ThemeIcon(iconType);
         } else if (iconType === '') {
-            // Empty string means no icon (used for separators)
             this.iconPath = undefined;
         } else {
-            // Files use file-code icon (decorations will show info, git, lint badges)
-            this.iconPath = new vscode.ThemeIcon('file-code');
+            // Use provided icon type ('code' for Replicated kinds, 'package' for K8s resources)
+            this.iconPath = new vscode.ThemeIcon(iconType);
         }
         
         if (filePath) {

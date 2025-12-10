@@ -67,7 +67,9 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     private async initializeGitApi(): Promise<void> {
         try {
             const gitExtension = vscode.extensions.getExtension('vscode.git');
-            if (!gitExtension) return;
+            if (!gitExtension) {
+                return;
+            }
 
             if (!gitExtension.isActive) {
                 await gitExtension.activate();
@@ -124,9 +126,13 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         }
 
         if (element) {
-            return element.children?.length ? element.children :
-                   element.isDirectory && element.filePath ? this.getDirectoryChildren(element.filePath, element.basePath!) :
-                   [];
+            if (element.children?.length) {
+                return element.children;
+            }
+            if (element.isDirectory && element.filePath) {
+                return this.getDirectoryChildren(element.filePath, element.basePath!);
+            }
+            return [];
         }
 
         // Root level: organize manifests by install method
@@ -140,7 +146,9 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             
             if (fs.existsSync(manifestPath)) {
                 const items = this.getOrganizedManifests(manifestPath);
-                if (items.length > 0) return items;
+                if (items.length > 0) {
+                    return items;
+                }
             }
         }
 
@@ -158,7 +166,9 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
 
     private getOrganizedManifests(manifestPath: string): ManifestItem[] {
         const allFiles = this.collectAllManifestFiles(manifestPath, manifestPath);
-        if (allFiles.length === 0) return [];
+        if (allFiles.length === 0) {
+            return [];
+        }
 
         const categorizedFiles = this.categorizeFiles(allFiles);
         return this.buildCategoryTree(categorizedFiles, manifestPath);
@@ -285,45 +295,17 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     private createFileItem(fullPath: string, basePath: string, fileName: string): ManifestItem {
         const lintStatus = this.lintStatuses.get(fullPath);
         const manifestInfo = this.parseManifestKind(fullPath);
-        
-        // Get documentation URL
         const docsUrl = getKindDocsUrl(manifestInfo.apiVersion, manifestInfo.kind, fileName);
-        
-        // Get icon for the manifest kind
         const iconPath = getIconForKind(manifestInfo.kind);
         
-        // Check if file has Git status - if not, add em space placeholder for consistent layout
+        // Placeholder maintains consistent spacing when file has no Git changes
         const gitStatus = this.getGitStatus(fullPath);
         this.gitPlaceholderProvider.setPlaceholder(fullPath, !gitStatus);
         
-        // Set description to show the kind
-        let description = '';
-        if (manifestInfo.kind) {
-            description = manifestInfo.kind.trim();
-        }
-        
-        // Add lint status to description for now (will be inline button on hover later)
-        if (this.lintHasRun) {
-            if (lintStatus && lintStatus.hasIssues) {
-                const parts: string[] = [];
-                if (lintStatus.errors > 0) {
-                    parts.push(`${lintStatus.errors} error${lintStatus.errors !== 1 ? 's' : ''}`);
-                }
-                if (lintStatus.warnings > 0) {
-                    parts.push(`${lintStatus.warnings} warning${lintStatus.warnings !== 1 ? 's' : ''}`);
-                }
-                if (lintStatus.info > 0) {
-                    parts.push(`${lintStatus.info} info`);
-                }
-                if (parts.length > 0 && description) {
-                    description += ' - ' + parts.join(' ');
-                }
-            }
-        }
-        
+        const description = this.buildFileDescription(manifestInfo.kind, lintStatus);
         const item = new ManifestItem(
             fileName,
-            description.trim(),
+            description,
             vscode.TreeItemCollapsibleState.None,
             fullPath,
             iconPath,
@@ -339,57 +321,71 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         };
         
         item.resourceUri = vscode.Uri.file(fullPath);
+        item.tooltip = this.buildFileTooltip(manifestInfo, fileName);
+        item.contextValue = docsUrl ? 'manifestFileWithDocs' : 'manifestFile';
         
-        // Build tooltip
-        const tooltipParts: string[] = [];
-        if (manifestInfo.kind) {
-            const kindDescription = getKindDescription(manifestInfo.apiVersion, manifestInfo.kind, fileName);
-            if (kindDescription) {
-                tooltipParts.push(kindDescription);
-            }
-        }
-        if (manifestInfo.apiVersion) {
-            tooltipParts.push(`API Version: ${manifestInfo.apiVersion}`);
-        }
-        item.tooltip = tooltipParts.join('\n\n');
-        
-        // Set context value for menus (determines which inline buttons show on hover)
-        // Info button will show on hover for files with docs
-        // Lint button will show on hover for all files
         if (docsUrl) {
-            item.contextValue = 'manifestFileWithDocs';
             (item as any).docsUrl = docsUrl;
-        } else {
-            item.contextValue = 'manifestFile';
         }
         
         return item;
     }
+
+    private buildFileDescription(kind: string | undefined, lintStatus: LintStatus | undefined): string {
+        let description = kind?.trim() || '';
+        
+        if (this.lintHasRun && lintStatus?.hasIssues) {
+            const parts: string[] = [];
+            if (lintStatus.errors > 0) {
+                parts.push(`${lintStatus.errors} error${lintStatus.errors !== 1 ? 's' : ''}`);
+            }
+            if (lintStatus.warnings > 0) {
+                parts.push(`${lintStatus.warnings} warning${lintStatus.warnings !== 1 ? 's' : ''}`);
+            }
+            if (lintStatus.info > 0) {
+                parts.push(`${lintStatus.info} info`);
+            }
+            
+            if (parts.length > 0 && description) {
+                description += ' - ' + parts.join(' ');
+            }
+        }
+        
+        return description.trim();
+    }
+
+    private buildFileTooltip(manifestInfo: ManifestInfo, fileName: string): string {
+        const parts: string[] = [];
+        
+        if (manifestInfo.kind) {
+            const kindDescription = getKindDescription(manifestInfo.apiVersion, manifestInfo.kind, fileName);
+            if (kindDescription) {
+                parts.push(kindDescription);
+            }
+        }
+        
+        if (manifestInfo.apiVersion) {
+            parts.push(`API Version: ${manifestInfo.apiVersion}`);
+        }
+        
+        return parts.join('\n\n');
+    }
     
-    /**
-     * Get Git status for a file
-     */
     private getGitStatus(filePath: string): 'M' | 'A' | 'D' | 'U' | undefined {
-        if (!this.gitApi || this.gitApi.repositories.length === 0) {
+        if (!this.gitApi?.repositories?.length) {
             return undefined;
         }
 
         try {
             const repo = this.gitApi.repositories[0];
-            const workingTreeChanges = repo.state.workingTreeChanges || [];
-            const indexChanges = repo.state.indexChanges || [];
-            const untrackedFiles = repo.state.untrackedChanges || [];
+            const { workingTreeChanges = [], indexChanges = [], untrackedChanges = [] } = repo.state;
             
-            // Check if file is untracked
-            if (untrackedFiles.some((change: any) => change.uri.fsPath === filePath)) {
+            if (untrackedChanges.some((change: any) => change.uri.fsPath === filePath)) {
                 return 'U';
             }
             
-            // Check if file is in index (staged)
-            const isInIndex = indexChanges.some((change: any) => change.uri.fsPath === filePath);
-            const isInWorkingTree = workingTreeChanges.some((change: any) => change.uri.fsPath === filePath);
-            
-            if (isInWorkingTree || isInIndex) {
+            if (workingTreeChanges.some((change: any) => change.uri.fsPath === filePath) ||
+                indexChanges.some((change: any) => change.uri.fsPath === filePath)) {
                 return 'M';
             }
             
@@ -401,55 +397,36 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     }
 
     private getDirectoryChildren(dirPath: string, basePath: string): ManifestItem[] {
-        const items: ManifestItem[] = [];
-        
         try {
             const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+            const directories = entries.filter(e => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name));
+            const files = entries.filter(e => e.isFile() && this.isManifestFile(e.name)).sort((a, b) => a.name.localeCompare(b.name));
             
-            // Separate directories and files
-            const directories: fs.Dirent[] = [];
-            const files: fs.Dirent[] = [];
-            
-            for (const entry of entries) {
-                if (entry.isDirectory()) {
-                    directories.push(entry);
-                } else if (entry.isFile() && this.isManifestFile(entry.name)) {
-                    files.push(entry);
-                }
-            }
-            
-            // Add directories first (sorted)
-            directories.sort((a, b) => a.name.localeCompare(b.name));
-            for (const dir of directories) {
-                const fullPath = path.join(dirPath, dir.name);
-                const item = new ManifestItem(
-                    dir.name,
-                    '',
-                    vscode.TreeItemCollapsibleState.Collapsed,
-                    fullPath,
-                    'folder',
-                    undefined,
-                    true,
-                    basePath
-                );
-                item.iconPath = vscode.ThemeIcon.Folder;
-                items.push(item);
-            }
-            
-            // Add files (sorted)
-            files.sort((a, b) => a.name.localeCompare(b.name));
-            for (const file of files) {
-                const fullPath = path.join(dirPath, file.name);
-                const fileItem = this.createFileItem(fullPath, basePath, file.name);
-                items.push(fileItem);
-            }
+            return [
+                ...directories.map(dir => {
+                    const fullPath = path.join(dirPath, dir.name);
+                    const item = new ManifestItem(
+                        dir.name,
+                        '',
+                        vscode.TreeItemCollapsibleState.Collapsed,
+                        fullPath,
+                        'folder',
+                        undefined,
+                        true,
+                        basePath
+                    );
+                    item.iconPath = vscode.ThemeIcon.Folder;
+                    return item;
+                }),
+                ...files.map(file => 
+                    this.createFileItem(path.join(dirPath, file.name), basePath, file.name)
+                )
+            ];
         } catch (error) {
             console.error(`Error reading directory ${dirPath}:`, error);
+            return [];
         }
-        
-        return items;
     }
-
 
     private parseManifestKind(filePath: string): ManifestInfo {
         try {
@@ -459,7 +436,7 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             if (docs.length > 0 && docs[0].toJS()) {
                 const firstDoc = docs[0].toJS() as any;
                 
-                // Support Bundle Secrets have troubleshoot.sh/kind label
+                // Support Bundle Secrets use troubleshoot.sh/kind label
                 if (firstDoc.kind === 'Secret' && 
                     firstDoc.metadata?.labels?.['troubleshoot.sh/kind'] === 'support-bundle') {
                     return {
