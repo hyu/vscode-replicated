@@ -27,17 +27,63 @@ class ManifestDecorationProvider implements vscode.FileDecorationProvider {
     provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
         const info = this.fileInfo.get(uri.fsPath);
         
+        // When file is modified, return undefined so only git's "M" decoration shows
         if (!info || info.isModified) {
             return undefined;
         }
 
-        // Show info badge for unmodified files with tooltip showing the kind
+        // Show EM SPACE (U+2003) badge for unmodified files to match the width of 'M' (git modified decoration)
+        // This maintains alignment when files are not modified, without showing a visible character
         return {
-            badge: 'ℹ',
+            badge: '\u2003', // EM SPACE - same width as M in monospace fonts
             tooltip: `Kind: ${info.kind}`
         };
     }
 }
+
+/**
+ * Category configuration for install methods
+ */
+interface CategoryConfig {
+    id: 'shared' | 'embedded-cluster' | 'kots' | 'helm';
+    title: string;
+    icon: string;
+    tooltip: string;
+    separator?: boolean;
+}
+
+/**
+ * Category configurations
+ */
+const CATEGORY_CONFIGS: CategoryConfig[] = [
+    {
+        id: 'shared',
+        title: 'Replicated Platform',
+        icon: 'settings-gear',
+        tooltip: 'Core configuration files for Replicated deployments'
+    },
+    {
+        id: 'embedded-cluster',
+        title: 'Embedded Cluster',
+        icon: 'package',
+        tooltip: 'Embedded Cluster (EC) is an install method that installs an embedded cluster, then installs your application.\nFor customer environments with NO existing Kubernetes, like Linux VM.',
+        separator: true  // Separator goes BEFORE this category
+    },
+    {
+        id: 'kots',
+        title: 'KOTS',
+        icon: 'server-environment',
+        tooltip: 'KOTS (Kubernetes Off-The-Shelf) is an install method that installs an embedded cluster, then installs your application.\nFor customer environments with NO existing Kubernetes, like Linux VM.',
+        separator: true  // Separator goes BEFORE this category
+    },
+    {
+        id: 'helm',
+        title: 'Helm CLI',
+        icon: 'symbol-method',
+        tooltip: 'Helm CLI is a popular install method for customers with existing Kubernetes clusters.',
+        separator: true  // Separator goes BEFORE this category
+    }
+];
 
 /**
  * Tree data provider for the Manifests view
@@ -167,87 +213,122 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         }
 
         // Categorize files by install method
+        const unidentified: ManifestItem[] = [];
         const sharedConfig: ManifestItem[] = [];
-        const helmInstall: ManifestItem[] = [];
+        const embeddedCluster: ManifestItem[] = [];
         const kotsInstall: ManifestItem[] = [];
+        const helmInstall: ManifestItem[] = [];
         
         for (const fileItem of allFiles) {
             const category = this.categorizeByInstallMethod(fileItem);
             
             switch (category) {
+                case 'unidentified':
+                    unidentified.push(fileItem);
+                    break;
                 case 'shared':
                     sharedConfig.push(fileItem);
                     break;
-                case 'helm':
-                    helmInstall.push(fileItem);
+                case 'embedded-cluster':
+                    embeddedCluster.push(fileItem);
                     break;
                 case 'kots':
                     kotsInstall.push(fileItem);
+                    break;
+                case 'helm':
+                    helmInstall.push(fileItem);
                     break;
             }
         }
 
         const categories: ManifestItem[] = [];
 
-        // Create Shared Install Config category
-        if (sharedConfig.length > 0) {
-            const sharedCategory = new ManifestItem(
-                'Shared Install Config',
-                `${sharedConfig.length} file${sharedConfig.length !== 1 ? 's' : ''}`,
-                vscode.TreeItemCollapsibleState.Expanded,
-                undefined,
-                'folder',
-                undefined,
-                false,
-                manifestPath
-            );
-            sharedCategory.iconPath = new vscode.ThemeIcon('settings-gear');
-            sharedCategory.children = sharedConfig;
-            categories.push(sharedCategory);
+        // Show unidentified files at the top level (not in a category)
+        if (unidentified.length > 0) {
+            categories.push(...unidentified);
         }
 
-        // Create Helm Install category
-        if (helmInstall.length > 0) {
-            const helmCategory = new ManifestItem(
-                'Helm Install',
-                `${helmInstall.length} file${helmInstall.length !== 1 ? 's' : ''}`,
-                vscode.TreeItemCollapsibleState.Expanded,
-                undefined,
-                'folder',
-                undefined,
-                false,
+        // Create categories dynamically from config
+        for (const config of CATEGORY_CONFIGS) {
+            const files = config.id === 'shared' ? sharedConfig :
+                         config.id === 'embedded-cluster' ? embeddedCluster :
+                         config.id === 'kots' ? kotsInstall :
+                         helmInstall;
+            
+            // Add separator BEFORE this category if specified
+            if (config.separator) {
+                categories.push(this.createSeparator());
+            }
+            
+            // Create category item
+            const categoryItem = this.createCategoryItem(
+                config.title,
+                config.icon,
+                config.tooltip,
+                files,
                 manifestPath
             );
-            helmCategory.iconPath = new vscode.ThemeIcon('package');
-            helmCategory.children = helmInstall;
-            categories.push(helmCategory);
-        }
-
-        // Create KOTS Install category
-        if (kotsInstall.length > 0) {
-            const kotsCategory = new ManifestItem(
-                'KOTS Install',
-                `${kotsInstall.length} file${kotsInstall.length !== 1 ? 's' : ''}`,
-                vscode.TreeItemCollapsibleState.Expanded,
-                undefined,
-                'folder',
-                undefined,
-                false,
-                manifestPath
-            );
-            kotsCategory.iconPath = new vscode.ThemeIcon('server-environment');
-            kotsCategory.children = kotsInstall;
-            categories.push(kotsCategory);
+            categories.push(categoryItem);
         }
 
         return categories;
     }
 
-    private categorizeByInstallMethod(fileItem: ManifestItem): 'shared' | 'helm' | 'kots' {
+    /**
+     * Creates a category item for the tree view
+     */
+    private createCategoryItem(
+        title: string,
+        icon: string,
+        tooltip: string,
+        files: ManifestItem[],
+        manifestPath: string
+    ): ManifestItem {
+        const fileCount = files.length;
+        const description = fileCount > 0 
+            ? `${fileCount} file${fileCount !== 1 ? 's' : ''}` 
+            : 'No files';
+        
+        const categoryItem = new ManifestItem(
+            title,
+            description,
+            vscode.TreeItemCollapsibleState.Expanded,
+            undefined,
+            'folder',
+            undefined,
+            true,
+            manifestPath
+        );
+        categoryItem.iconPath = new vscode.ThemeIcon(icon);
+        categoryItem.tooltip = tooltip;
+        categoryItem.children = files;
+        
+        return categoryItem;
+    }
+
+    private categorizeByInstallMethod(fileItem: ManifestItem): 'unidentified' | 'shared' | 'embedded-cluster' | 'kots' | 'helm' {
         const fileName = fileItem.label.toLowerCase();
         const kind = fileItem.kind;
         
-        // Shared config files (used across multiple install methods)
+        // Check if this file can be identified by our system
+        // A file is unidentified if we don't have a description for it
+        const manifestInfo = this.parseManifestKind(fileItem.filePath || '');
+        const canIdentify = this.canIdentifyManifest(manifestInfo.apiVersion, manifestInfo.kind, fileName);
+        
+        if (!canIdentify) {
+            return 'unidentified';
+        }
+        
+        // Check Embedded Cluster FIRST (more specific) before generic Config check
+        if (fileName.includes('embedded-cluster')) {
+            return 'embedded-cluster';
+        }
+        
+        if (manifestInfo.apiVersion === 'embeddedcluster.replicated.com/v1beta1') {
+            return 'embedded-cluster';
+        }
+        
+        // THEN check shared config files (more generic - used across multiple install methods)
         if (kind === 'Config' || fileName === 'config.yaml' || fileName === 'config.yml') {
             return 'shared';
         }
@@ -282,10 +363,6 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             return 'kots';
         }
         
-        if (fileName.includes('embedded-cluster')) {
-            return 'kots';
-        }
-        
         // Default to shared for other known Replicated kinds
         if (this.isKnownReplicatedKind(kind)) {
             return 'shared';
@@ -293,6 +370,12 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         
         // All other Kubernetes resources go to KOTS
         return 'kots';
+    }
+
+    private canIdentifyManifest(apiVersion: string | undefined, kind: string | undefined, fileName: string): boolean {
+        // Check if we have a description for this manifest
+        const description = this.getKindDescription(apiVersion, kind || '', fileName);
+        return description !== undefined;
     }
 
     private isKnownReplicatedKind(kind: string | undefined): boolean {
@@ -313,6 +396,51 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         ];
         
         return replicatedKinds.includes(kind);
+    }
+
+    private getIconForKind(kind: string | undefined): string {
+        if (!kind) {
+            return 'code';
+        }
+        
+        // Application / Runtime resources (what actually runs)
+        const applicationKinds = [
+            'Deployment',
+            'Service',
+            'ConfigMap',
+            'Secret',
+            'StatefulSet',
+            'Ingress',
+            'PersistentVolumeClaim',
+            'Chart',
+            'HelmChart'
+        ];
+        
+        if (applicationKinds.includes(kind)) {
+            return 'package';
+        }
+        
+        // Default for all other kinds (Admin Console, Troubleshooting, etc.)
+        return 'code';
+    }
+
+    /**
+     * Creates a visual separator for the tree view
+     */
+    private createSeparator(): ManifestItem {
+        const separator = new ManifestItem(
+            '┄┄┄┄┄┄┄┄┄┄┄',
+            '',
+            vscode.TreeItemCollapsibleState.None,
+            undefined,
+            '',  // iconType - empty string for no icon
+            undefined,
+            false,
+            undefined
+        );
+        separator.contextValue = 'separator';
+        separator.tooltip = undefined;  // No tooltip for separators
+        return separator;
     }
 
     private collectAllManifestFiles(dirPath: string, basePath: string): ManifestItem[] {
@@ -355,7 +483,7 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         this.decorationProvider.setFileInfo(fullPath, manifestInfo.kind, isModified);
         
         let description = '';
-        let iconPath = 'document';
+        let iconPath = this.getIconForKind(manifestInfo.kind);
         
         if (lintStatus && lintStatus.hasIssues) {
             const parts: string[] = [];
@@ -365,20 +493,19 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             }
             if (lintStatus.warnings > 0) {
                 parts.push(`${lintStatus.warnings} warning${lintStatus.warnings !== 1 ? 's' : ''}`);
-                if (iconPath === 'document') {
+                if (iconPath !== 'error') {
                     iconPath = 'warning';
                 }
             }
             if (lintStatus.info > 0) {
                 parts.push(`${lintStatus.info} info`);
-                if (iconPath === 'document') {
+                if (iconPath !== 'error' && iconPath !== 'warning') {
                     iconPath = 'info-icon';
                 }
             }
             description = parts.join(', ').trim();
         } else {
-            // No issues - show check icon
-            iconPath = 'pass';
+            // No issues - use icon based on kind
             // Show kind in description for clarity (right-aligned)
             if (manifestInfo.kind) {
                 description = manifestInfo.kind.trim();
@@ -409,8 +536,8 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         const tooltipParts: string[] = [];
         
         if (manifestInfo.kind) {
-            // Add description based on kind
-            const kindDescription = this.getKindDescription(manifestInfo.kind, fileName);
+            // Add description based on apiVersion + kind
+            const kindDescription = this.getKindDescription(manifestInfo.apiVersion, manifestInfo.kind, fileName);
             if (kindDescription) {
                 tooltipParts.push(kindDescription);
             }
@@ -429,45 +556,56 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         return item;
     }
 
-    private getKindDescription(kind: string, fileName: string): string | undefined {
-        // Map of kind to description (using Map to avoid ESLint naming convention issues)
+    private getKindDescription(apiVersion: string | undefined, kind: string, fileName: string): string | undefined {
+        // Use apiVersion + kind together for accurate identification
+        const key = apiVersion && kind ? `${apiVersion}/${kind}` : undefined;
+        
+        // Map of apiVersion/kind to description
         const descriptions = new Map<string, string>([
-            // Replicated Resources
-            ['Config', 'Define the configuration screen for your customers to input their organization\'s unique install values (database URLs, API keys, feature flags, etc.)'],
-            ['Application', 'Customize Admin Console for your customers with your custom branding, application status indicators, port forwarding options, and release notes'],
-            ['HelmChart', 'Specify how KOTS should deploy your Helm chart to your customer\'s cluster (KOTS), or define your chart specification (Helm)'],
-            ['EmbeddedClusterConfig', 'Configure the embedded Kubernetes cluster your customers will run in their infrastructure - cluster version, node settings, and requirements'],
-            ['SigApplication', 'Add custom buttons and links to your customer\'s Kubernetes dashboard (typically excluded from KOTS installations with kots.io/exclude annotation)'],
-            ['Preflight', 'Define the validation checks to run in your customer\'s environment before installation to verify their system meets requirements (memory, disk, permissions, etc.)'],
-            ['SupportBundle', 'Specify what diagnostic data to collect from your customer\'s environment when they need support (application logs, pod status, resource states, custom collectors)'],
-            ['ConfigValues', 'Provide default config values for your customers doing automated/headless installations without the Admin Console UI in their CI/CD pipelines'],
-            ['Redactor', 'Define patterns to automatically remove your customer\'s sensitive information (their passwords, API tokens, encryption keys) from support bundles they send you'],
-            ['LintConfig', 'Customize the release linter rules that validate your manifests before you deploy new releases to your customers'],
+            // Replicated KOTS Resources
+            ['kots.io/v1beta1/Config', 'Define the config screen for your customers to set their org\'s unique install values.\ne.g., database URLs, API keys, feature flags…'],
+            ['kots.io/v1beta1/Application', 'Customize Admin Console for your customers with your custom branding, app status indicators, port forwarding, release notes…'],
+            ['kots.io/v1beta2/HelmChart', 'Specify how KOTS deploys Helm charts to your customer\'s cluster (KOTS), or define your chart specification (Helm)'],
+            ['kots.io/v1beta1/ConfigValues', 'Set default config values for customers doing automated / headless installs without Admin Console UI. e.g., for CI/CD pipelines'],
+            ['kots.io/v1beta1/LintConfig', 'Customize release linter rules to validate manifests before deploying new releases to your customers'],
+            
+            // Embedded Cluster
+            ['embeddedcluster.replicated.com/v1beta1/Config', 'Configure the embedded Kubernetes cluster your customers will run in their infrastructure.\ne.g., cluster version, node settings, requirements…'],
+            
+            // Kubernetes Application
+            ['app.k8s.io/v1beta1/Application', 'Adds buttons and links to the Replicated Admin Console dashboard'],
+            
+            // Troubleshoot Resources
+            ['troubleshoot.sh/v1beta2/Preflight', 'Define validation checks to run in your customer\'s environment before actual installation, to verify their system meets requirements.\ne.g., memory, disk, permissions…'],
+            ['troubleshoot.sh/v1beta2/SupportBundle', 'Specify the diagnostic data to collect from your customer\'s environment when they need support.\ne.g., application logs, pod status, resource states, custom collectors…'],
+            ['troubleshoot.sh/v1beta2/Redactor', 'Define patterns to automatically remove your customer\'s sensitive info from support bundles they send you.\ne.g., passwords, API tokens, encryption keys'],
+            ['troubleshoot.sh/v1beta2/Analyzer', 'Define custom analysis rules for support bundles to automatically diagnose common issues in your customer\'s environment'],
             
             // Standard Kubernetes Resources (expanded for K8s beginners)
-            ['Deployment', 'Manage your application pods in your customer\'s cluster - define rolling updates, scaling behavior, and ensure their desired replicas stay running'],
-            ['Service', 'Provide a stable network endpoint for your application in your customer\'s cluster (works like a load balancer routing traffic to your pods)'],
-            ['ConfigMap', 'Store non-sensitive configuration data your application needs at runtime in your customer\'s cluster (settings, feature flags, config files your pods read)'],
-            ['Secret', 'Store sensitive data your application needs in your customer\'s cluster (passwords, API keys, certificates) - base64 encoded with restricted access controls'],
-            ['StatefulSet', 'Manage stateful applications in your customer\'s cluster (databases, queues) that need persistent identity, stable network IDs, and ordered deployment'],
-            ['Ingress', 'Define how external HTTP/HTTPS traffic reaches your application in your customer\'s cluster - configure URL paths, domains, and TLS certificates'],
-            ['PersistentVolumeClaim', 'Request persistent storage for your application in your customer\'s cluster - ensures your data survives pod restarts and rescheduling']
+            ['apps/v1/Deployment', 'Manage your application pods in your customer\'s cluster\ne.g., define rolling updates, scaling behavior, ensure desired replicas run…'],
+            ['v1/Service', 'Provide a stable network endpoint for your app in your customer\'s cluster. Works like a load balancer routing traffic to your pods.'],
+            ['v1/ConfigMap', 'Store non-sensitive configuration data your app needs at runtime in your customer\'s cluster.\ne.g., settings, feature flags, config files for pods…)'],
+            ['v1/Secret', 'Store sensitive data your application needs in your customer\'s cluster. Secrets are base64 encoded with restricted access controls.\ne.g., passwords, API keys, certificates…'],
+            ['apps/v1/StatefulSet', 'Manage stateful applications in your customer\'s cluster.\ne.g., databases and queues that need persistent identity, stable network IDs, ordered deployment…'],
+            ['networking.k8s.io/v1/Ingress', 'Define how external HTTP/HTTPS traffic reaches your application in your customer\'s cluster\ne.g., URL paths, domains, TLS certificates…'],
+            ['v1/PersistentVolumeClaim', 'Request persistent storage for your app in your customer\'s cluster. Ensure your data survives pod restarts and rescheduling.']
         ]);
         
-        // Check if we have a specific description for this kind
-        const description = descriptions.get(kind);
-        if (description) {
-            return description;
+        // Primary: Check apiVersion + kind together
+        if (key) {
+            const description = descriptions.get(key);
+            if (description) {
+                return description;
+            }
         }
         
-        // For embedded-cluster, check filename pattern
-        if (fileName.includes('embedded-cluster')) {
-            return 'KOTS Install (Embedded Cluster only) - Specifies Embedded Cluster version and configuration for bundled Kubernetes installations';
+        // Secondary: Fallback to file name patterns for cases where apiVersion might be missing
+        if (fileName.includes('embedded-cluster') && kind === 'Config') {
+            return 'Configure the embedded Kubernetes cluster your customers will run in their infrastructure - cluster version, node settings, and requirements';
         }
         
-        // For k8s-app or Application kind with kots.io
-        if (fileName.includes('k8s-app')) {
-            return 'Shared Config - Kubernetes SIG Application custom resource that adds metadata, buttons, and links to the Admin Console dashboard';
+        if (fileName.includes('k8s-app') && kind === 'Application') {
+            return 'Add custom buttons and links to your customer\'s Kubernetes dashboard (typically excluded from KOTS installations with kots.io/exclude annotation)';
         }
         
         return undefined;
@@ -532,6 +670,17 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             // Get the first document's kind
             if (docs.length > 0 && docs[0].toJS()) {
                 const firstDoc = docs[0].toJS() as any;
+                
+                // Special handling for Support Bundle Secrets
+                // Check if this is a Secret with the troubleshoot.sh/kind: support-bundle label
+                if (firstDoc.kind === 'Secret' && 
+                    firstDoc.metadata?.labels?.['troubleshoot.sh/kind'] === 'support-bundle') {
+                    return {
+                        kind: 'SupportBundle',
+                        apiVersion: 'troubleshoot.sh/v1beta2'
+                    };
+                }
+                
                 return {
                     kind: firstDoc.kind,
                     apiVersion: firstDoc.apiVersion

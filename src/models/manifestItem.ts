@@ -36,6 +36,10 @@ export class ManifestItem extends vscode.TreeItem {
                     // Use pass/check icon for files that pass validation
                     this.iconPath = new vscode.ThemeIcon('pass');
                     break;
+                case '':
+                    // Empty string means no icon (used for separators)
+                    this.iconPath = undefined;
+                    break;
                 default:
                     this.iconPath = new vscode.ThemeIcon('file-code');
             }
