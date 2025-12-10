@@ -6,7 +6,9 @@ The Replicated VSCode extension allows to enable linting of your kubernetes mani
 
 ### Sidebar Panel
 
-The extension adds a dedicated Replicated panel to the Activity Bar (left sidebar) that displays:
+The extension adds a dedicated Replicated panel to the Activity Bar (left sidebar) with three main views:
+
+#### 1. Manifests View
 
 - **All manifest files** in your configured manifests folder
 - **Intelligent sorting** of manifests:
@@ -19,10 +21,10 @@ The extension adds a dedicated Replicated panel to the Activity Bar (left sideba
 - **Detailed tooltips** showing:
   - File path
   - Kubernetes/KOTS kind
+  - Description of the resource type
   - API version
-  - Lint status
+  - Last linted timestamp
 - **Quick actions**:
-  - **Test in Environment** button (🚀) to deploy and test your manifests in a selected environment
   - **Lint All** button (▶️) to manually lint all manifests
   - **Refresh** button (🔄) to update the view
   - Click any file to open it in the editor
@@ -32,6 +34,34 @@ Files are shown with color-coded icons:
 - 🟡 Yellow warning icon for files with warnings  
 - 🔵 Blue info icon for files with information messages
 - ✅ Green check for files with no issues
+
+#### 2. Actions View
+
+Development workflow tools for testing and deployment:
+
+- **Auto-lint on save** toggle for automatic linting
+- **Test in Environment** dropdown to deploy to Development, Staging, or Production
+- **CLI Status** showing installed Replicated CLI version with quick refresh
+- **Cluster Resources** - After deployment, view a compact list of Kubernetes resources:
+  - Deployments, Pods, Services, ConfigMaps, and Secrets
+  - One-line display with status indicators (● healthy, ⚠ warnings)
+  - Quick access to detailed Dashboard view
+
+#### 3. Cluster Dashboard View
+
+Access via the **"📊 Dashboard"** button in the Actions panel or command palette:
+
+- **Cluster information** with health status
+- **Summary statistics** for all resource types
+- **Detailed resource cards** showing:
+  - Deployments with replica counts and images
+  - Pods with status, node placement, and restart counts
+  - Services with type and endpoint information
+  - ConfigMaps and Secrets with data key counts
+- **Beautiful, responsive UI** that adapts to VS Code themes
+- **Hover effects** and visual status indicators
+
+For more details, see [CLUSTER_RESOURCES_FEATURE.md](CLUSTER_RESOURCES_FEATURE.md) and [CLUSTER_RESOURCES_QUICKSTART.md](CLUSTER_RESOURCES_QUICKSTART.md)
 
 #### Supported Manifest Types
 

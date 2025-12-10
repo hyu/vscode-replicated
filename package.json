@@ -33,12 +33,12 @@
     "views": {
       "replicated": [
         {
-          "id": "replicatedActions",
-          "name": "Actions"
-        },
-        {
           "id": "replicatedManifests",
           "name": "Manifests"
+        },
+        {
+          "id": "replicatedActions",
+          "name": "Replicated Dev"
         }
       ]
     },

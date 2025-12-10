@@ -1,7 +1,11 @@
 import * as vscode from 'vscode';
 
-export class ClusterResourcesPanel {
-    public static currentPanel: ClusterResourcesPanel | undefined;
+/**
+ * Webview panel for displaying cluster resources dashboard
+ * Shows deployments, pods, services, configmaps, and secrets
+ */
+export class ClusterDashboardPanel {
+    public static currentPanel: ClusterDashboardPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
 
@@ -16,8 +20,8 @@ export class ClusterResourcesPanel {
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
 
-        if (ClusterResourcesPanel.currentPanel) {
-            ClusterResourcesPanel.currentPanel._panel.reveal(column);
+        if (ClusterDashboardPanel.currentPanel) {
+            ClusterDashboardPanel.currentPanel._panel.reveal(column);
             return;
         }
 
@@ -31,11 +35,11 @@ export class ClusterResourcesPanel {
             }
         );
 
-        ClusterResourcesPanel.currentPanel = new ClusterResourcesPanel(panel, extensionUri);
+        ClusterDashboardPanel.currentPanel = new ClusterDashboardPanel(panel, extensionUri);
     }
 
     public dispose() {
-        ClusterResourcesPanel.currentPanel = undefined;
+        ClusterDashboardPanel.currentPanel = undefined;
         this._panel.dispose();
         while (this._disposables.length) {
             const disposable = this._disposables.pop();

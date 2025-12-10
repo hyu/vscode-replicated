@@ -1,18 +1,12 @@
 // The module 'vscode' contains the VS Code extensibility API	
 // Import the module and reference it with the alias vscode in your code below
-import {promisify} from 'node:util';
-import stream from 'node:stream';
 import * as vscode from 'vscode';
-import * as tar from 'tar';
-import got, { PlainResponse } from 'got';
-import * as fs from 'fs';
-import path = require('path/posix');
-import { allowedNodeEnvironmentFlags } from 'node:process';
-import { languages, Diagnostic, DiagnosticSeverity } from 'vscode';
-import { ManifestTreeDataProvider } from './manifestTreeProvider';
-import { ActionsViewProvider } from './actionsViewProvider';
-import { CLIManager } from './cliManager';
-import { ClusterResourcesPanel } from './clusterResourcesPanel';
+import * as path from 'path/posix';
+import { ManifestsViewProvider } from './views/manifestsView';
+import { DevActionsViewProvider } from './views/devActionsView';
+import { CLIService } from './services/cliService';
+import { ClusterDashboardPanel } from './views/clusterDashboardView';
+import { LintService } from './services/lintService';
 
 
 // This method is called when your extension is activated
@@ -22,44 +16,62 @@ export function activate(context: vscode.ExtensionContext) {
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "replicated" is now active!');
-	let diagnosticCollection = languages.createDiagnosticCollection("replicated");
+	let diagnosticCollection = vscode.languages.createDiagnosticCollection("replicated");
 	let enableOnSave = false;
 
-	// Create and register the actions view provider
-	const actionsViewProvider = new ActionsViewProvider(context.extensionUri);
+	// Create and register the dev actions view provider
+	const devActionsViewProvider = new DevActionsViewProvider(context.extensionUri);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
-			ActionsViewProvider.viewType,
-			actionsViewProvider
+			DevActionsViewProvider.viewType,
+			devActionsViewProvider
 		)
 	);
 
-	// Create and register the manifest tree data provider
-	const manifestTreeProvider = new ManifestTreeDataProvider(diagnosticCollection);
+	// Create and register the manifests tree view provider
+	const manifestsViewProvider = new ManifestsViewProvider(diagnosticCollection);
 	const treeView = vscode.window.createTreeView('replicatedManifests', {
-		treeDataProvider: manifestTreeProvider,
+		treeDataProvider: manifestsViewProvider,
 		showCollapseAll: false
 	});
 
+	// Set dynamic title based on workspace name
+	function updateTreeViewTitle() {
+		const workspaceName = vscode.workspace.workspaceFolders?.[0]?.name;
+		if (workspaceName) {
+			treeView.title = workspaceName;
+		}
+	}
+	updateTreeViewTitle();
+
+	// Update title when workspace changes
+	context.subscriptions.push(
+		vscode.workspace.onDidChangeWorkspaceFolders(() => {
+			updateTreeViewTitle();
+		})
+	);
+
 	// Check CLI status and update context
-	const cliManager = CLIManager.getInstance();
+	const cliService = CLIService.getInstance();
+	const lintService = new LintService();
+	
 	async function updateCLIContext() {
-		await actionsViewProvider.updateCLIStatus();
+		await devActionsViewProvider.updateCLIStatus();
 	}
 	updateCLIContext();
 
 	let d1 = vscode.commands.registerCommand('replicated.lint.enable', () => {
 		diagnosticCollection.clear();
 		enableOnSave = true;
-		actionsViewProvider.setAutoLintEnabled(true);
-		processFolders(diagnosticCollection, manifestTreeProvider);
+		devActionsViewProvider.setAutoLintEnabled(true);
+		lintService.lintWorkspace(diagnosticCollection);
 	});
 
 	let d2 = vscode.commands.registerCommand('replicated.lint.disable', () => {
 		diagnosticCollection.clear();
 		enableOnSave = false;
-		actionsViewProvider.setAutoLintEnabled(false);
-		manifestTreeProvider.refresh();
+		devActionsViewProvider.setAutoLintEnabled(false);
+		manifestsViewProvider.refresh();
 	});
 
 	// The command has been defined in the package.json file
@@ -68,7 +80,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let d3 = vscode.workspace.onDidSaveTextDocument((document: vscode.TextDocument) => {
 		if (enableOnSave) {
 			diagnosticCollection.clear();
-			processFolders(diagnosticCollection, manifestTreeProvider);
+			lintService.lintWorkspace(diagnosticCollection);
 		}
 	});
 
@@ -80,14 +92,14 @@ export function activate(context: vscode.ExtensionContext) {
 			title: "Linting all manifests...",
 			cancellable: false
 		}, async (progress) => {
-			await processFolders(diagnosticCollection, manifestTreeProvider);
+			await lintService.lintWorkspace(diagnosticCollection);
 		});
 		vscode.window.showInformationMessage('Lint complete!');
 	});
 
 	// Refresh manifests view
 	let d5 = vscode.commands.registerCommand('replicated.refreshManifests', () => {
-		manifestTreeProvider.refresh();
+		manifestsViewProvider.refresh();
 	});
 
 	// Open manifest file
@@ -138,7 +150,7 @@ export function activate(context: vscode.ExtensionContext) {
 				const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.path;
 				if (workspaceFolder) {
 					const manifestPath = path.join(workspaceFolder, manifestFolder);
-					await getlintdata(manifestPath, diagnosticCollection, manifestTreeProvider);
+					await lintService.lintFolder(manifestPath, diagnosticCollection);
 				}
 			});
 		}
@@ -146,7 +158,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Install CLI
 	let d9 = vscode.commands.registerCommand('replicated.installCLI', async () => {
-		const installed = await cliManager.installCLI();
+		const installed = await cliService.installCLI();
 		if (installed) {
 			await updateCLIContext();
 		}
@@ -154,9 +166,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Check CLI status
 	let d10 = vscode.commands.registerCommand('replicated.checkCLI', async () => {
-		cliManager.clearCache();
+		cliService.clearCache();
 		await updateCLIContext();
-		const status = await cliManager.checkCLIStatus();
+		const status = await cliService.checkCLIStatus();
 		
 		if (status.installed) {
 			vscode.window.showInformationMessage(`Replicated CLI is installed. Version: ${status.version}`);
@@ -171,14 +183,14 @@ export function activate(context: vscode.ExtensionContext) {
 			// Disable auto-lint
 			diagnosticCollection.clear();
 			enableOnSave = false;
-			actionsViewProvider.setAutoLintEnabled(false);
-			manifestTreeProvider.refresh();
+			devActionsViewProvider.setAutoLintEnabled(false);
+			manifestsViewProvider.refresh();
 		} else {
 			// Enable auto-lint
 			diagnosticCollection.clear();
 			enableOnSave = true;
-			actionsViewProvider.setAutoLintEnabled(true);
-			await processFolders(diagnosticCollection, manifestTreeProvider);
+			devActionsViewProvider.setAutoLintEnabled(true);
+			await lintService.lintWorkspace(diagnosticCollection);
 		}
 	});
 
@@ -198,129 +210,10 @@ export function activate(context: vscode.ExtensionContext) {
 	
 	// Show Cluster Resources Dashboard
 	let d13 = vscode.commands.registerCommand('replicated.showClusterResources', () => {
-		ClusterResourcesPanel.createOrShow(context.extensionUri);
+		ClusterDashboardPanel.createOrShow(context.extensionUri);
 	});
 
 	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, treeView);
-}
-
-async function processFolders(diagnosticCollection: vscode.DiagnosticCollection, manifestTreeProvider?: ManifestTreeDataProvider): Promise<void> {
-	if (vscode.workspace.workspaceFolders? vscode.workspace.workspaceFolders.length > 0 : false) {
-		const promises = (vscode.workspace.workspaceFolders? vscode.workspace.workspaceFolders : []).map(async function (fldr) {
-			const absolutePath = fldr.uri.path;
-			const manifestFldr = vscode.workspace.getConfiguration('replicated').get("manifestsFolder");
-			
-			await getlintdata(path.join(absolutePath, String(manifestFldr)), diagnosticCollection, manifestTreeProvider);
-		});
-		
-		await Promise.all(promises);
-	}
-}
-
-async function getlintdata(fldr: string, diagnosticCollection: vscode.DiagnosticCollection, manifestTreeProvider?: ManifestTreeDataProvider): Promise<void> {
-	return new Promise((resolve, reject) => {
-		const pipeline = promisify(stream.pipeline);
-
-		let readable = tar.c({}, [fldr]);
-		const lintstream = got.stream.post('https://lint.replicated.com/v1/lint');
-		
-		pipeline(
-			readable,
-			lintstream,
-			new stream.PassThrough()
-		);
-
-		lintstream.on('response', async (response: PlainResponse) => {
-			console.log('success: ' + response.statusCode);
-			let rawData = '';
-			response.on('data', (chunk) => { rawData += chunk; });
-			response.on('end', () => {
-				try {
-					let lintResults = JSON.parse(rawData);
-					let map = new Map();
-
-					lintResults.lintExpressions.forEach(function (lintExpression: { path: string; }) {
-						if (map.has(lintExpression.path)) {
-							var exps = map.get(lintExpression.path);
-							exps.push(lintExpression);
-							map.set(lintExpression.path, exps);
-						} else {
-							map.set(lintExpression.path, [lintExpression]);
-						}
-					});
-
-					for (let key of map.keys()) {
-						let diagnostics: Diagnostic[] = [];
-						for (let lexpr of map.get(key)) {
-							// Check if positions exists and is iterable
-							if (lexpr.positions && Array.isArray(lexpr.positions)) {
-								for (let pos of lexpr.positions) {
-									// Create a range that highlights the entire line or uses specific columns if available
-									let startLine = pos.start.line - 1;
-									let startCol = pos.start.position || 0;
-									let endLine = pos.end?.line ? pos.end.line - 1 : startLine;
-									let endCol = pos.end?.position || Number.MAX_SAFE_INTEGER;
-									
-									let range = new vscode.Range(
-										new vscode.Position(startLine, startCol),
-										new vscode.Position(endLine, endCol)
-									);
-									
-									let message = lexpr.message;
-									let severity = DiagnosticSeverity.Warning;
-									if (lexpr.type === "info") {
-										severity = DiagnosticSeverity.Information;
-									}
-									if (lexpr.type === "error") {
-										severity = DiagnosticSeverity.Error;
-									}
-									
-									let diagnostic = new Diagnostic(range, message, severity);
-									diagnostic.source = "Replicated";
-									diagnostics.push(diagnostic);
-								}
-							} else {
-								// If no positions, create a diagnostic at line 0
-								let range = new vscode.Range(
-									new vscode.Position(0, 0),
-									new vscode.Position(0, Number.MAX_SAFE_INTEGER)
-								);
-								let message = lexpr.message;
-								let severity = DiagnosticSeverity.Warning;
-								if (lexpr.type === "info") {
-									severity = DiagnosticSeverity.Information;
-								}
-								if (lexpr.type === "error") {
-									severity = DiagnosticSeverity.Error;
-								}
-								
-								let diagnostic = new Diagnostic(range, message, severity);
-								diagnostic.source = "Replicated";
-								diagnostics.push(diagnostic);
-							}
-						}
-						diagnosticCollection.set(vscode.Uri.file(key), diagnostics);
-					}
-
-					// Update the tree view with new lint time
-					if (manifestTreeProvider) {
-						manifestTreeProvider.updateLastLintTime();
-					}
-
-					resolve();
-				} catch (error) {
-					console.error('Error parsing lint results:', error);
-					reject(error);
-				}
-			});
-		});
-
-		lintstream.on('error', (error) => {
-			console.error('Lint stream error:', error);
-			vscode.window.showErrorMessage(`Failed to lint manifests: ${error.message}`);
-			reject(error);
-		});
-	});
 }
 
 // This method is called when your extension is deactivated

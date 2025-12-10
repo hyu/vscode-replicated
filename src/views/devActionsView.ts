@@ -1,17 +1,21 @@
 import * as vscode from 'vscode';
-import { CLIManager } from './cliManager';
+import { CLIService } from '../services/cliService';
 
-export class ActionsViewProvider implements vscode.WebviewViewProvider {
+/**
+ * Webview provider for the Replicated Dev view
+ * Displays development actions like testing in environments and CLI management
+ */
+export class DevActionsViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'replicatedActions';
 
     private _view?: vscode.WebviewView;
     private autoLintEnabled: boolean = false;
-    private cliManager: CLIManager;
+    private cliService: CLIService;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
     ) {
-        this.cliManager = CLIManager.getInstance();
+        this.cliService = CLIService.getInstance();
     }
 
     public resolveWebviewView(
@@ -70,7 +74,7 @@ export class ActionsViewProvider implements vscode.WebviewViewProvider {
     }
 
     public async updateCLIStatus() {
-        const status = await this.cliManager.checkCLIStatus();
+        const status = await this.cliService.checkCLIStatus();
         if (this._view) {
             this._view.webview.postMessage({
                 type: 'updateCLI',

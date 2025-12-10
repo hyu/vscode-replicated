@@ -2,13 +2,18 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
+import { LintStatus, ManifestInfo } from '../models/types';
+import { ManifestItem } from '../models/manifestItem';
 
-export class ManifestTreeDataProvider implements vscode.TreeDataProvider<ManifestItem> {
+/**
+ * Tree data provider for the Manifests view
+ * Displays project manifest files organized by type (Replicated vs Kubernetes resources)
+ */
+export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<ManifestItem | undefined | void> = new vscode.EventEmitter<ManifestItem | undefined | void>();
     readonly onDidChangeTreeData: vscode.Event<ManifestItem | undefined | void> = this._onDidChangeTreeData.event;
 
     private lintStatuses: Map<string, LintStatus> = new Map();
-    private lastLintTime: Date | undefined;
 
     constructor(private diagnosticCollection: vscode.DiagnosticCollection) {
         // Watch for diagnostic changes to update tree
@@ -20,11 +25,6 @@ export class ManifestTreeDataProvider implements vscode.TreeDataProvider<Manifes
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
-    }
-
-    updateLastLintTime(): void {
-        this.lastLintTime = new Date();
-        this.refresh();
     }
 
     private updateLintStatuses(): void {
@@ -361,7 +361,7 @@ export class ManifestTreeDataProvider implements vscode.TreeDataProvider<Manifes
     }
 
 
-    private parseManifestKind(filePath: string): { kind?: string; apiVersion?: string } {
+    private parseManifestKind(filePath: string): ManifestInfo {
         try {
             const content = fs.readFileSync(filePath, 'utf8');
             const docs = yaml.parseAllDocuments(content);
@@ -386,79 +386,5 @@ export class ManifestTreeDataProvider implements vscode.TreeDataProvider<Manifes
         const ext = path.extname(filename).toLowerCase();
         return ext === '.yaml' || ext === '.yml';
     }
-
-    private getTimeAgo(date: Date): string {
-        const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-        
-        if (seconds < 10) {
-            return 'just now';
-        } else if (seconds < 60) {
-            return `${seconds}s ago`;
-        }
-        
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) {
-            return `${minutes}m ago`;
-        }
-        
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) {
-            return `${hours}h ago`;
-        }
-        
-        const days = Math.floor(hours / 24);
-        return `${days}d ago`;
-    }
-}
-
-class ManifestItem extends vscode.TreeItem {
-    public children?: ManifestItem[];
-    
-    constructor(
-        public readonly label: string,
-        public readonly description: string,
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly filePath: string | undefined,
-        iconType: string,
-        public readonly kind?: string,
-        public readonly isDirectory: boolean = false,
-        public readonly basePath?: string
-    ) {
-        super(label, collapsibleState);
-        this.description = description;
-        
-        // Don't override icon for folders
-        if (!isDirectory) {
-            // Set icon based on lint status
-            switch (iconType) {
-                case 'error':
-                    this.iconPath = new vscode.ThemeIcon('error', new vscode.ThemeColor('errorForeground'));
-                    break;
-                case 'warning':
-                    this.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('editorWarning.foreground'));
-                    break;
-                case 'info-icon':
-                    this.iconPath = new vscode.ThemeIcon('info', new vscode.ThemeColor('editorInfo.foreground'));
-                    break;
-                case 'pass':
-                    // Use pass/check icon for files that pass validation
-                    this.iconPath = new vscode.ThemeIcon('pass', new vscode.ThemeColor('testing.iconPassed'));
-                    break;
-                default:
-                    this.iconPath = new vscode.ThemeIcon('file-code');
-            }
-        }
-        
-        if (filePath) {
-            this.resourceUri = vscode.Uri.file(filePath);
-        }
-    }
-}
-
-interface LintStatus {
-    errors: number;
-    warnings: number;
-    info: number;
-    hasIssues: boolean;
 }
 

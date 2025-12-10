@@ -1,28 +1,27 @@
 import * as vscode from 'vscode';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { CLIStatus } from '../models/types';
 
 const execAsync = promisify(exec);
 
-export interface CLIStatus {
-    installed: boolean;
-    version?: string;
-    error?: string;
-}
-
-export class CLIManager {
-    private static instance: CLIManager;
+/**
+ * Service for managing Replicated CLI installation and status
+ * Singleton pattern to share state across the extension
+ */
+export class CLIService {
+    private static instance: CLIService;
     private cachedStatus?: CLIStatus;
     private lastCheck?: number;
     private readonly CACHE_DURATION = 30000; // 30 seconds
 
     private constructor() {}
 
-    public static getInstance(): CLIManager {
-        if (!CLIManager.instance) {
-            CLIManager.instance = new CLIManager();
+    public static getInstance(): CLIService {
+        if (!CLIService.instance) {
+            CLIService.instance = new CLIService();
         }
-        return CLIManager.instance;
+        return CLIService.instance;
     }
 
     public async checkCLIStatus(): Promise<CLIStatus> {
