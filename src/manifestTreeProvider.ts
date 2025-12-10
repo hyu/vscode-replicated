@@ -221,21 +221,19 @@ export class ManifestTreeDataProvider implements vscode.TreeDataProvider<Manifes
             if (lintStatus.info > 0) {
                 parts.push(`${lintStatus.info} info`);
                 if (iconPath === 'document') {
-                    iconPath = 'info';
+                    iconPath = 'info-icon';
                 }
             }
             description = parts.join(', ');
-        } else if (this.lastLintTime) {
+        } else {
+            // No issues - show info icon in description area (same column where "M" appears)
+            // Note: VS Code git decorations will override this if file is modified
             iconPath = 'pass';
-            // Add non-breaking space to match the width of git decoration (M) for consistent alignment
-            description = '\u00A0';
+            description = '$(info)';
         }
         
-        // Pad label to reserve space for git decorations and ensure consistent icon alignment
-        const paddedLabel = fileName + '\u00A0\u00A0';
-        
         const item = new ManifestItem(
-            paddedLabel,
+            fileName,
             description,
             vscode.TreeItemCollapsibleState.None,
             fullPath,
@@ -251,25 +249,65 @@ export class ManifestTreeDataProvider implements vscode.TreeDataProvider<Manifes
             arguments: [fullPath]
         };
         
-        const relativePath = path.relative(basePath, fullPath);
-        let tooltipText = `${relativePath}\n`;
+        // Build concise tooltip with description and API info
+        const tooltipParts: string[] = [];
+        
         if (manifestInfo.kind) {
-            tooltipText += `Kind: ${manifestInfo.kind}\n`;
-        }
-        if (manifestInfo.apiVersion) {
-            tooltipText += `API: ${manifestInfo.apiVersion}\n`;
-        }
-        if (this.lastLintTime) {
-            const timeAgo = this.getTimeAgo(this.lastLintTime);
-            tooltipText += `Last linted: ${timeAgo}`;
+            // Add description based on kind
+            const kindDescription = this.getKindDescription(manifestInfo.kind, fileName);
+            if (kindDescription) {
+                tooltipParts.push(kindDescription);
+            }
         }
         
-        item.tooltip = tooltipText;
+        if (manifestInfo.apiVersion) {
+            tooltipParts.push(`API Version: ${manifestInfo.apiVersion}`);
+        }
+        
+        // Join with double newline for better readability
+        item.tooltip = tooltipParts.join('\n\n');
         
         // Add inline action button for linting
         item.contextValue = 'manifestFile';
         
         return item;
+    }
+
+    private getKindDescription(kind: string, fileName: string): string | undefined {
+        // Map of kind to description (using Map to avoid ESLint naming convention issues)
+        const descriptions = new Map<string, string>([
+            ['Config', 'Defines a customizable configuration screen in the Admin Console for collecting customer-supplied values and settings during installation'],
+            ['Application', 'Replicated Application custom resource that enables Admin Console features like branding, status informers, port forwarding, and release notes'],
+            ['Preflight', 'Defines pre-installation checks to validate that the environment meets application requirements before deployment'],
+            ['SupportBundle', 'Defines what diagnostic data and logs to collect when troubleshooting application issues'],
+            ['HelmChart', 'Provides instructions to the installer on how to deploy a specific Helm chart, including chart name, version, and values'],
+            ['Deployment', 'Kubernetes Deployment resource that manages a replicated application with desired state and rolling update strategy'],
+            ['Service', 'Kubernetes Service resource that exposes an application running on a set of Pods as a network service'],
+            ['ConfigMap', 'Kubernetes ConfigMap that stores non-confidential data in key-value pairs for application configuration'],
+            ['Secret', 'Kubernetes Secret that stores sensitive information such as passwords, tokens, or keys'],
+            ['Analyzer', 'Defines analysis rules for troubleshooting and validating application state and cluster conditions'],
+            ['Backup', 'Defines backup and disaster recovery configuration for application data'],
+            ['Troubleshoot', 'Defines troubleshooting collectors and analyzers for diagnosing application issues'],
+            ['Redactor', 'Defines rules for redacting sensitive information from support bundles and logs']
+        ]);
+        
+        // Check if we have a specific description for this kind
+        const description = descriptions.get(kind);
+        if (description) {
+            return description;
+        }
+        
+        // For embedded-cluster, check filename pattern
+        if (fileName.includes('embedded-cluster')) {
+            return 'Specifies the Embedded Cluster version and cluster characteristics for bundled Kubernetes installations on VMs or bare metal';
+        }
+        
+        // For k8s-app or Application kind with kots.io
+        if (fileName.includes('k8s-app')) {
+            return 'Kubernetes SIG Application custom resource that adds metadata, buttons, and links to the Admin Console dashboard';
+        }
+        
+        return undefined;
     }
 
     private getDirectoryChildren(dirPath: string, basePath: string): ManifestItem[] {
@@ -399,10 +437,11 @@ class ManifestItem extends vscode.TreeItem {
                 case 'warning':
                     this.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('editorWarning.foreground'));
                     break;
-                case 'info':
+                case 'info-icon':
                     this.iconPath = new vscode.ThemeIcon('info', new vscode.ThemeColor('editorInfo.foreground'));
                     break;
                 case 'pass':
+                    // Use pass/check icon for files that pass validation
                     this.iconPath = new vscode.ThemeIcon('pass', new vscode.ThemeColor('testing.iconPassed'));
                     break;
                 default:

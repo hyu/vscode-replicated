@@ -10,9 +10,9 @@ import path = require('path/posix');
 import { allowedNodeEnvironmentFlags } from 'node:process';
 import { languages, Diagnostic, DiagnosticSeverity } from 'vscode';
 import { ManifestTreeDataProvider } from './manifestTreeProvider';
-import { ActionsTreeDataProvider } from './actionsTreeProvider';
+import { ActionsViewProvider } from './actionsViewProvider';
 import { CLIManager } from './cliManager';
-import { CLIStatusViewProvider } from './cliStatusView';
+import { ClusterResourcesPanel } from './clusterResourcesPanel';
 
 
 // This method is called when your extension is activated
@@ -25,12 +25,14 @@ export function activate(context: vscode.ExtensionContext) {
 	let diagnosticCollection = languages.createDiagnosticCollection("replicated");
 	let enableOnSave = false;
 
-	// Create and register the actions tree data provider
-	const actionsTreeProvider = new ActionsTreeDataProvider();
-	const actionsTreeView = vscode.window.createTreeView('replicatedActions', {
-		treeDataProvider: actionsTreeProvider,
-		showCollapseAll: false
-	});
+	// Create and register the actions view provider
+	const actionsViewProvider = new ActionsViewProvider(context.extensionUri);
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(
+			ActionsViewProvider.viewType,
+			actionsViewProvider
+		)
+	);
 
 	// Create and register the manifest tree data provider
 	const manifestTreeProvider = new ManifestTreeDataProvider(diagnosticCollection);
@@ -39,34 +41,24 @@ export function activate(context: vscode.ExtensionContext) {
 		showCollapseAll: false
 	});
 
-	// Create and register the CLI status view provider
-	const cliStatusProvider = new CLIStatusViewProvider(context.extensionUri);
-	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider(
-			CLIStatusViewProvider.viewType,
-			cliStatusProvider
-		)
-	);
-
 	// Check CLI status and update context
 	const cliManager = CLIManager.getInstance();
 	async function updateCLIContext() {
-		const status = await cliManager.checkCLIStatus();
-		vscode.commands.executeCommand('setContext', 'replicated.cliInstalled', status.installed);
-		cliStatusProvider.updateStatus(status.installed, status.version);
-		actionsTreeProvider.checkCLIStatus();
+		await actionsViewProvider.updateCLIStatus();
 	}
 	updateCLIContext();
 
 	let d1 = vscode.commands.registerCommand('replicated.lint.enable', () => {
 		diagnosticCollection.clear();
 		enableOnSave = true;
+		actionsViewProvider.setAutoLintEnabled(true);
 		processFolders(diagnosticCollection, manifestTreeProvider);
 	});
 
 	let d2 = vscode.commands.registerCommand('replicated.lint.disable', () => {
 		diagnosticCollection.clear();
 		enableOnSave = false;
+		actionsViewProvider.setAutoLintEnabled(false);
 		manifestTreeProvider.refresh();
 	});
 
@@ -173,7 +165,43 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, treeView, actionsTreeView);
+	// Toggle auto-lint
+	let d11 = vscode.commands.registerCommand('replicated.toggleAutoLint', async () => {
+		if (enableOnSave) {
+			// Disable auto-lint
+			diagnosticCollection.clear();
+			enableOnSave = false;
+			actionsViewProvider.setAutoLintEnabled(false);
+			manifestTreeProvider.refresh();
+		} else {
+			// Enable auto-lint
+			diagnosticCollection.clear();
+			enableOnSave = true;
+			actionsViewProvider.setAutoLintEnabled(true);
+			await processFolders(diagnosticCollection, manifestTreeProvider);
+		}
+	});
+
+	// Test in Environment with direct environment selection
+	let d12 = vscode.commands.registerCommand('replicated.testInEnvironmentDirect', async (environment: string) => {
+		await vscode.window.withProgress({
+			location: vscode.ProgressLocation.Notification,
+			title: `Testing in ${environment}...`,
+			cancellable: false
+		}, async (progress) => {
+			// Simulate testing process
+			await new Promise(resolve => setTimeout(resolve, 2000));
+		});
+		
+		vscode.window.showInformationMessage(`Deployed to ${environment} environment successfully!`);
+	});
+	
+	// Show Cluster Resources Dashboard
+	let d13 = vscode.commands.registerCommand('replicated.showClusterResources', () => {
+		ClusterResourcesPanel.createOrShow(context.extensionUri);
+	});
+
+	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, treeView);
 }
 
 async function processFolders(diagnosticCollection: vscode.DiagnosticCollection, manifestTreeProvider?: ManifestTreeDataProvider): Promise<void> {

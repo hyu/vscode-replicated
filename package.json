@@ -1,7 +1,7 @@
 {
   "name": "replicated",
   "displayName": "Replicated",
-  "description": "Lint your kubernetes manifest files using Replicated linting service",
+  "description": "Get your first working release on Replicated and test in customer-representative environments.",
   "version": "0.0.2",
   "publisher": "replicated",
   "engines": {
@@ -39,11 +39,6 @@
         {
           "id": "replicatedManifests",
           "name": "Manifests"
-        },
-        {
-          "id": "replicatedCLIStatus",
-          "name": "CLI Status",
-          "when": "!replicated.cliInstalled"
         }
       ]
     },
@@ -51,10 +46,6 @@
       {
         "view": "replicatedActions",
         "contents": "[$(rocket) Test in Environment](command:replicated.testInEnvironment)\nDeploy and test your manifests in a selected environment."
-      },
-      {
-        "view": "replicatedCLIStatus",
-        "contents": "The Replicated CLI is not installed.\n[Install CLI](command:replicated.installCLI)\n[Check Status](command:replicated.checkCLI)"
       }
     ],
     "commands": [
@@ -65,6 +56,10 @@
       {
         "command": "replicated.lint.disable",
         "title": "Replicated Lint Disable"
+      },
+      {
+        "command": "replicated.toggleAutoLint",
+        "title": "Toggle Auto-lint on Save"
       },
       {
         "command": "replicated.lintAll",
@@ -99,25 +94,30 @@
         "command": "replicated.checkCLI",
         "title": "Check CLI Status",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "replicated.testInEnvironmentDirect",
+        "title": "Test in Environment (Direct)",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "replicated.showClusterResources",
+        "title": "Show Cluster Resources",
+        "icon": "$(server)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "replicated.testInEnvironment",
-          "when": "view == replicatedManifests",
-          "group": "navigation@1"
-        },
-        {
           "command": "replicated.lintAll",
           "when": "view == replicatedManifests",
-          "group": "navigation@2",
+          "group": "navigation@1",
           "icon": "$(play)"
         },
         {
           "command": "replicated.refreshManifests",
           "when": "view == replicatedManifests",
-          "group": "navigation@3",
+          "group": "navigation@2",
           "icon": "$(refresh)"
         }
       ],
@@ -126,13 +126,6 @@
           "command": "replicated.lintFile",
           "when": "view == replicatedManifests && viewItem == manifestFile",
           "group": "inline"
-        }
-      ],
-      "view/title": [
-        {
-          "command": "replicated.installCLI",
-          "when": "view == replicatedCLIStatus",
-          "group": "navigation"
         }
       ]
     },
