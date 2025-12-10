@@ -23,6 +23,7 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
         context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken,
     ) {
+        console.log('DevActionsViewProvider.resolveWebviewView called');
         this._view = webviewView;
 
         webviewView.webview.options = {
@@ -387,8 +388,8 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                     </button>
                 </div>
                 
-                <!-- Resources Section -->
-                <div class="resources-section" id="resourcesSection">
+                <!-- Resources Section - FAKE DATA FOR TESTING -->
+                <div class="resources-section" id="resourcesSection" style="display: block;">
                     <div class="resources-header">
                         <span class="resources-title">🎲 random-linux-42</span>
                         <button class="dashboard-button" onclick="openDashboard()">
@@ -397,6 +398,7 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                         </button>
                     </div>
                     <div class="resource-list">
+                        <!-- FAKE TEST DATA - Deployments -->
                         <div class="resource-item">
                             <span class="resource-status"></span>
                             <span class="resource-icon">📦</span>
@@ -409,6 +411,7 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                             <span class="resource-name">han-frontend</span>
                             <span class="resource-detail">3/3</span>
                         </div>
+                        <!-- FAKE TEST DATA - Pods -->
                         <div class="resource-item">
                             <span class="resource-status"></span>
                             <span class="resource-icon">🔷</span>
@@ -433,6 +436,7 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                             <span class="resource-name">han-frontend-6b8c9d7f4-t3v8w</span>
                             <span class="resource-detail">1 restart</span>
                         </div>
+                        <!-- FAKE TEST DATA - Services -->
                         <div class="resource-item">
                             <span class="resource-status"></span>
                             <span class="resource-icon">🌐</span>
@@ -445,12 +449,14 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                             <span class="resource-name">han-frontend</span>
                             <span class="resource-detail">LoadBalancer</span>
                         </div>
+                        <!-- FAKE TEST DATA - ConfigMaps -->
                         <div class="resource-item">
                             <span class="resource-status"></span>
                             <span class="resource-icon">⚙️</span>
                             <span class="resource-name">han-config</span>
                             <span class="resource-detail">3 keys</span>
                         </div>
+                        <!-- FAKE TEST DATA - Secrets -->
                         <div class="resource-item">
                             <span class="resource-status"></span>
                             <span class="resource-icon">🔐</span>

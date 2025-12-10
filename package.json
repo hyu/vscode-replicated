@@ -16,8 +16,10 @@
     "theme": "dark"
   },
   "activationEvents": [
+    "onStartupFinished",
     "onCommand:replicated.lint.enable",
-    "onView:replicatedManifests"
+    "onView:replicatedManifests",
+    "onView:replicatedActions"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -42,28 +44,22 @@
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "replicatedActions",
-        "contents": "[$(rocket) Test in Environment](command:replicated.testInEnvironment)\nDeploy and test your manifests in a selected environment."
-      }
-    ],
     "commands": [
       {
         "command": "replicated.lint.enable",
-        "title": "Replicated Lint Enable"
+        "title": "Replicated: Enable Lint"
       },
       {
         "command": "replicated.lint.disable",
-        "title": "Replicated Lint Disable"
+        "title": "Replicated: Disable Lint"
       },
       {
         "command": "replicated.toggleAutoLint",
-        "title": "Toggle Auto-lint on Save"
+        "title": "Replicated: Toggle Auto-lint on Save"
       },
       {
         "command": "replicated.lintAll",
-        "title": "Lint All Manifests",
+        "title": "Replicated: Lint All Manifests",
         "icon": "$(play)"
       },
       {
@@ -82,17 +78,17 @@
       },
       {
         "command": "replicated.testInEnvironment",
-        "title": "Test in Environment",
+        "title": "Replicated: Test in Environment",
         "icon": "$(rocket)"
       },
       {
         "command": "replicated.installCLI",
-        "title": "Install Replicated CLI",
+        "title": "Replicated: Install CLI",
         "icon": "$(cloud-download)"
       },
       {
         "command": "replicated.checkCLI",
-        "title": "Check CLI Status",
+        "title": "Replicated: Check CLI Status",
         "icon": "$(refresh)"
       },
       {
@@ -102,7 +98,7 @@
       },
       {
         "command": "replicated.showClusterResources",
-        "title": "Show Cluster Resources",
+        "title": "Replicated: Show Cluster Resources",
         "icon": "$(server)"
       }
     ],

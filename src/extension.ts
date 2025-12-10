@@ -20,13 +20,14 @@ export function activate(context: vscode.ExtensionContext) {
 	let enableOnSave = false;
 
 	// Create and register the dev actions view provider
+	console.log('Registering DevActionsViewProvider for view:', DevActionsViewProvider.viewType);
 	const devActionsViewProvider = new DevActionsViewProvider(context.extensionUri);
-	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider(
-			DevActionsViewProvider.viewType,
-			devActionsViewProvider
-		)
+	const registration = vscode.window.registerWebviewViewProvider(
+		DevActionsViewProvider.viewType,
+		devActionsViewProvider
 	);
+	context.subscriptions.push(registration);
+	console.log('DevActionsViewProvider registered successfully');
 
 	// Create and register the manifests tree view provider
 	const manifestsViewProvider = new ManifestsViewProvider(diagnosticCollection);

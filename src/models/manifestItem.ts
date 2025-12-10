@@ -24,17 +24,17 @@ export class ManifestItem extends vscode.TreeItem {
             // Set icon based on lint status
             switch (iconType) {
                 case 'error':
-                    this.iconPath = new vscode.ThemeIcon('error', new vscode.ThemeColor('errorForeground'));
+                    this.iconPath = new vscode.ThemeIcon('error');
                     break;
                 case 'warning':
-                    this.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('editorWarning.foreground'));
+                    this.iconPath = new vscode.ThemeIcon('warning');
                     break;
                 case 'info-icon':
-                    this.iconPath = new vscode.ThemeIcon('info', new vscode.ThemeColor('editorInfo.foreground'));
+                    this.iconPath = new vscode.ThemeIcon('info');
                     break;
                 case 'pass':
                     // Use pass/check icon for files that pass validation
-                    this.iconPath = new vscode.ThemeIcon('pass', new vscode.ThemeColor('testing.iconPassed'));
+                    this.iconPath = new vscode.ThemeIcon('pass');
                     break;
                 default:
                     this.iconPath = new vscode.ThemeIcon('file-code');
