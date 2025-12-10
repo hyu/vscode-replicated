@@ -201,7 +201,14 @@ export function activate(context: vscode.ExtensionContext) {
 		ClusterDashboardPanel.createOrShow(context.extensionUri);
 	});
 
-	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13);
+	// Open documentation URL
+	let d14 = vscode.commands.registerCommand('replicated.openDocs', (item: any) => {
+		if (item && item.docsUrl) {
+			vscode.env.openExternal(vscode.Uri.parse(item.docsUrl));
+		}
+	});
+
+	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14);
 }
 
 export function deactivate() {}

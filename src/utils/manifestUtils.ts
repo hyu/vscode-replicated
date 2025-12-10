@@ -9,6 +9,7 @@ export interface CategoryConfig {
     title: string;
     icon: string;
     tooltip: string;
+    docsUrl?: string;
     separator?: boolean;
 }
 
@@ -20,27 +21,31 @@ export const CATEGORY_CONFIGS: CategoryConfig[] = [
         id: 'shared',
         title: 'Replicated Platform',
         icon: 'settings-gear',
-        tooltip: 'Core configuration files for Replicated deployments. [Learn more](https://docs.replicated.com/intro-replicated)'
+        tooltip: 'Core configuration files for Replicated deployments.',
+        docsUrl: 'https://docs.replicated.com/intro-replicated'
     },
     {
         id: 'embedded-cluster',
         title: 'Embedded Cluster',
         icon: 'package',
-        tooltip: 'Embedded Cluster (EC) is an install method that installs an embedded cluster, then installs your application.\nFor customer environments with NO existing Kubernetes, like Linux VM. [Learn more](https://docs.replicated.com/vendor/embedded-overview)',
+        tooltip: 'Embedded Cluster (EC) is an install method that installs an embedded cluster, then installs your application.\nFor customer environments with NO existing Kubernetes, like Linux VM.',
+        docsUrl: 'https://docs.replicated.com/vendor/embedded-overview',
         separator: true
     },
     {
         id: 'kots',
         title: 'KOTS',
         icon: 'server-environment',
-        tooltip: 'KOTS (Kubernetes Off-The-Shelf) is an install method that installs your application in an existing Kubernetes cluster.\nProvides an Admin Console for managing installations. [Learn more](https://docs.replicated.com/intro-kots)',
+        tooltip: 'KOTS (Kubernetes Off-The-Shelf) is an install method that installs your application in an existing Kubernetes cluster.\nProvides an Admin Console for managing installations.',
+        docsUrl: 'https://docs.replicated.com/intro-kots',
         separator: true
     },
     {
         id: 'helm',
         title: 'Helm CLI',
         icon: 'symbol-method',
-        tooltip: 'Helm CLI is a popular install method for customers with existing Kubernetes clusters. [Learn more](https://docs.replicated.com/vendor/helm-install-overview)',
+        tooltip: 'Helm CLI is a popular install method for customers with existing Kubernetes clusters.',
+        docsUrl: 'https://docs.replicated.com/vendor/helm-install-overview',
         separator: true
     }
 ];
@@ -206,5 +211,59 @@ export function getIconForKind(kind: string | undefined): string {
     ];
     
     return applicationKinds.includes(kind) ? 'package' : 'code';
+}
+
+/**
+ * Documentation URLs for manifest kinds
+ */
+const KIND_DOCS_URLS = new Map<string, string>([
+    // Replicated KOTS Resources
+    ['kots.io/v1beta1/Config', 'https://docs.replicated.com/reference/kots-kinds-config'],
+    ['kots.io/v1beta1/Application', 'https://docs.replicated.com/reference/kots-kinds-application'],
+    ['kots.io/v1beta2/HelmChart', 'https://docs.replicated.com/reference/kots-kinds-helmchart'],
+    ['kots.io/v1beta1/ConfigValues', 'https://docs.replicated.com/reference/kots-kinds-configvalues'],
+    ['kots.io/v1beta1/LintConfig', 'https://docs.replicated.com/reference/kots-kinds-lintconfig'],
+    
+    // Embedded Cluster
+    ['embeddedcluster.replicated.com/v1beta1/Config', 'https://docs.replicated.com/vendor/embedded-overview'],
+    
+    // Troubleshoot Resources
+    ['troubleshoot.sh/v1beta2/Preflight', 'https://troubleshoot.sh/docs/preflight/'],
+    ['troubleshoot.sh/v1beta2/SupportBundle', 'https://troubleshoot.sh/docs/support-bundle/'],
+    ['troubleshoot.sh/v1beta2/Redactor', 'https://troubleshoot.sh/docs/redactor/'],
+    ['troubleshoot.sh/v1beta2/Analyzer', 'https://troubleshoot.sh/docs/analyze/'],
+]);
+
+/**
+ * Gets documentation URL for a manifest kind
+ */
+export function getKindDocsUrl(
+    apiVersion: string | undefined,
+    kind: string | undefined,
+    fileName: string
+): string | undefined {
+    if (!apiVersion || !kind) {
+        return undefined;
+    }
+    
+    const key = `${apiVersion}/${kind}`;
+    const url = KIND_DOCS_URLS.get(key);
+    
+    if (url) {
+        return url;
+    }
+    
+    // Fallback: link to general Kubernetes docs for standard K8s resources
+    if (apiVersion.startsWith('apps/v1') || apiVersion.startsWith('v1/') || apiVersion.startsWith('networking.k8s.io/')) {
+        const kindLower = kind.toLowerCase();
+        return `https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/${kindLower}-v1/`;
+    }
+    
+    // Fallback: link to Replicated docs for unknown Replicated kinds
+    if (isKnownReplicatedKind(kind)) {
+        return 'https://docs.replicated.com/reference/kots-kinds';
+    }
+    
+    return undefined;
 }
 

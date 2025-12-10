@@ -77,6 +77,11 @@
         "title": "Open Manifest"
       },
       {
+        "command": "replicated.openDocs",
+        "title": "Learn More",
+        "icon": "$(info)"
+      },
+      {
         "command": "replicated.testInEnvironment",
         "title": "Replicated: Test in Environment",
         "icon": "$(rocket)"
@@ -121,6 +126,21 @@
         {
           "command": "replicated.lintFile",
           "when": "view == replicatedManifests && viewItem == manifestFile",
+          "group": "inline"
+        },
+        {
+          "command": "replicated.lintFile",
+          "when": "view == replicatedManifests && viewItem == manifestFileWithDocs",
+          "group": "inline"
+        },
+        {
+          "command": "replicated.openDocs",
+          "when": "view == replicatedManifests && viewItem == categoryWithDocs",
+          "group": "inline"
+        },
+        {
+          "command": "replicated.openDocs",
+          "when": "view == replicatedManifests && viewItem == manifestFileWithDocs",
           "group": "inline"
         }
       ]

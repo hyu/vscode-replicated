@@ -36,6 +36,14 @@ export class ManifestItem extends vscode.TreeItem {
                     // Use pass/check icon for files that pass validation
                     this.iconPath = new vscode.ThemeIcon('pass');
                     break;
+                case 'package':
+                    // Application/runtime resources (Deployments, Services, ConfigMaps, Secrets, etc.)
+                    this.iconPath = new vscode.ThemeIcon('package');
+                    break;
+                case 'code':
+                    // Configuration/admin resources (Config, Application, Preflight, etc.)
+                    this.iconPath = new vscode.ThemeIcon('code');
+                    break;
                 case '':
                     // Empty string means no icon (used for separators)
                     this.iconPath = undefined;
