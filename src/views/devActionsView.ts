@@ -37,8 +37,15 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-        // Update CLI status immediately
-        this.updateCLIStatus();
+        // Update CLI status and login status in parallel (non-blocking)
+        // These are fire-and-forget - errors are handled internally
+        this.updateCLIStatus().catch(err => {
+            console.error('Failed to update CLI status:', err);
+        });
+        
+        this.updateLoginStatus().catch(err => {
+            console.error('Failed to update login status:', err);
+        });
 
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(data => {
@@ -61,6 +68,15 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'checkCLI':
                     vscode.commands.executeCommand('replicated.checkCLI');
+                    break;
+                case 'checkLogin':
+                    this.updateLoginStatus();
+                    break;
+                case 'login':
+                    this.handleLogin();
+                    break;
+                case 'logout':
+                    this.handleLogout();
                     break;
                 case 'openDashboard':
                     vscode.commands.executeCommand('replicated.showClusterResources');
@@ -117,25 +133,89 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
     }
 
     public async updateCLIStatus() {
-        const status = await this.cliService.checkCLIStatus();
-        if (this._view) {
-            this._view.webview.postMessage({
-                type: 'updateCLI',
-                installed: status.installed,
-                version: status.version,
-                updateAvailable: status.updateAvailable,
-                latestVersion: status.latestVersion
-            });
+        try {
+            const status = await this.cliService.checkCLIStatus();
+            if (this._view) {
+                this._view.webview.postMessage({
+                    type: 'updateCLI',
+                    installed: status.installed,
+                    version: status.version,
+                    updateAvailable: status.updateAvailable,
+                    latestVersion: status.latestVersion
+                });
+            }
+        } catch (error) {
+            console.error('Error checking CLI status:', error);
+            // Send error state to webview
+            if (this._view) {
+                this._view.webview.postMessage({
+                    type: 'updateCLI',
+                    installed: false,
+                    version: null,
+                    updateAvailable: false,
+                    latestVersion: null
+                });
+            }
         }
     }
 
+    public async updateLoginStatus() {
+        try {
+            const status = await this.cliService.checkLoginStatus();
+            if (this._view) {
+                this._view.webview.postMessage({
+                    type: 'updateLogin',
+                    loggedIn: status.loggedIn,
+                    error: status.error
+                });
+            }
+        } catch (error) {
+            console.error('Error checking login status:', error);
+            // Send error state to webview
+            if (this._view) {
+                this._view.webview.postMessage({
+                    type: 'updateLogin',
+                    loggedIn: false,
+                    error: 'Check failed'
+                });
+            }
+        }
+    }
+
+    private async handleLogin() {
+        const result = await this.cliService.login();
+        if (result.message) {
+            if (result.success) {
+                vscode.window.showInformationMessage(result.message);
+            } else {
+                vscode.window.showErrorMessage(result.message);
+            }
+        }
+        // Update login status after a short delay to allow login to complete
+        // Use setTimeout with catch to handle any errors
+        setTimeout(() => {
+            this.updateLoginStatus().catch(err => {
+                console.error('Failed to update login status after login:', err);
+            });
+        }, 3000);
+    }
+
+    private async handleLogout() {
+        const result = await this.cliService.logout();
+        if (result.message) {
+            if (result.success) {
+                vscode.window.showInformationMessage(result.message);
+            } else {
+                vscode.window.showErrorMessage(result.message);
+            }
+        }
+        // Update login status immediately
+        this.updateLoginStatus().catch(err => {
+            console.error('Failed to update login status after logout:', err);
+        });
+    }
+
     private _getHtmlForWebview(webview: vscode.Webview): string {
-        // Generate icon URIs using asWebviewUri() for external icon files
-        // These can be used in the HTML template without inlining
-        const checkIconUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'img', 'check-icon.svg')
-        );
-        
         // Get the path to the HTML template file
         // Try multiple possible locations to handle both development and packaged scenarios
         const possiblePaths = [
@@ -150,12 +230,7 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
         for (const htmlPath of possiblePaths) {
             try {
                 if (fs.existsSync(htmlPath)) {
-                    let htmlContent = fs.readFileSync(htmlPath, 'utf-8');
-                    // Replace placeholder with actual icon URI
-                    htmlContent = htmlContent.replace(
-                        /\{\{CHECK_ICON_URI\}\}/g,
-                        checkIconUri.toString()
-                    );
+                    const htmlContent = fs.readFileSync(htmlPath, 'utf-8');
                     return htmlContent;
                 }
             } catch (error) {

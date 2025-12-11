@@ -32,7 +32,8 @@ export class CLIService {
         }
 
         try {
-            const { stdout } = await execAsync('replicated version');
+            // Add timeout to prevent hanging - replicated version should be fast
+            const { stdout } = await execAsync('replicated version', { timeout: 5000 });
             const output = stdout.trim();
             
             // Parse the output from "replicated version" command
@@ -92,6 +93,79 @@ export class CLIService {
         } catch (error) {
             // If brew check fails, return undefined
             return undefined;
+        }
+    }
+
+    public async checkLoginStatus(): Promise<{ loggedIn: boolean; error?: string }> {
+        try {
+            // First check if CLI is installed by checking version (should be cached)
+            const cliStatus = await this.checkCLIStatus();
+            if (!cliStatus.installed) {
+                return { loggedIn: false, error: 'CLI not installed' };
+            }
+
+            // Try to run 'replicated login' command with short timeout
+            // If already logged in, it will error with "already credentials" message
+            // If not logged in, it will try to open browser (which we'll catch with timeout)
+            const { stdout, stderr } = await execAsync('replicated login', { timeout: 1500 });
+            const output = (stdout + stderr).toLowerCase();
+            
+            // If we see "already credentials" or "already logged in", user is logged in
+            if (output.includes('already credentials') || output.includes('already logged in')) {
+                return { loggedIn: true };
+            }
+            
+            // If we get here without error, assume not logged in
+            return { loggedIn: false };
+        } catch (error: any) {
+            const errorMessage = error.message.toLowerCase();
+            
+            // Check if error message indicates already logged in
+            if (errorMessage.includes('already credentials') || errorMessage.includes('already logged in')) {
+                return { loggedIn: true };
+            }
+            
+            // Check if CLI is not installed
+            if (errorMessage.includes('command not found') || errorMessage.includes('not found')) {
+                return { loggedIn: false, error: 'CLI not installed' };
+            }
+            
+            // Timeout or other errors might mean we tried to open browser (not logged in)
+            // or the command is hanging - either way, assume not logged in
+            if (errorMessage.includes('timeout') || errorMessage.includes('timed out')) {
+                return { loggedIn: false };
+            }
+            
+            // For any other error, assume not logged in
+            return { loggedIn: false };
+        }
+    }
+
+    public async login(): Promise<{ success: boolean; message?: string }> {
+        try {
+            // Check if already logged in first
+            const status = await this.checkLoginStatus();
+            if (status.loggedIn) {
+                return { success: true, message: 'Already logged in' };
+            }
+
+            // Run login command in terminal so user can see the process
+            const terminal = vscode.window.createTerminal('Replicated Login');
+            terminal.show();
+            terminal.sendText('replicated login');
+            
+            return { success: true, message: 'Login initiated. Please complete authentication in your browser.' };
+        } catch (error: any) {
+            return { success: false, message: error.message };
+        }
+    }
+
+    public async logout(): Promise<{ success: boolean; message?: string }> {
+        try {
+            await execAsync('replicated logout');
+            return { success: true, message: 'Logged out successfully' };
+        } catch (error: any) {
+            return { success: false, message: error.message };
         }
     }
 

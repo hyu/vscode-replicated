@@ -35,7 +35,7 @@ class GitPlaceholderDecorationProvider implements vscode.FileDecorationProvider 
 
     provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
         return this.filesNeedingPlaceholder.has(uri.fsPath)
-            ? { badge: '\u2003', tooltip: 'No changes' }
+            ? { badge: '\u2003' }
             : undefined;
     }
 }

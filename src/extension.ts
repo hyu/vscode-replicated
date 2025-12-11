@@ -153,8 +153,70 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// Check CLI status
+	let d10 = vscode.commands.registerCommand('replicated.checkCLI', async () => {
+		cliService.clearCache();
+		await devActionsViewProvider.updateCLIStatus();
+		const status = await cliService.checkCLIStatus();
+		
+		if (status.installed) {
+			vscode.window.showInformationMessage(`Replicated CLI is installed. Version: ${status.version}`);
+		} else {
+			vscode.window.showWarningMessage('Replicated CLI is not installed.');
+		}
+	});
+
+	// Toggle code sync (Dev Mode for CMX) - Frontend demo only, no backend functionality
+	let d11 = vscode.commands.registerCommand('replicated.toggleCodeSync', async () => {
+		// No-op for frontend demo - just allows the toggle to work without errors
+	});
+
+	// Toggle auto-lint
+	let d12 = vscode.commands.registerCommand('replicated.toggleAutoLint', async () => {
+		if (enableOnSave) {
+			// Disable auto-lint
+			diagnosticCollection.clear();
+			enableOnSave = false;
+			devActionsViewProvider.setAutoLintEnabled(false);
+			manifestsViewProvider.refresh();
+		} else {
+			// Enable auto-lint
+			diagnosticCollection.clear();
+			enableOnSave = true;
+			devActionsViewProvider.setAutoLintEnabled(true);
+			manifestsViewProvider.markLintAsRun();
+			await lintService.lintWorkspace(diagnosticCollection);
+		}
+	});
+
+	// Test in Environment with direct environment selection
+	let d13 = vscode.commands.registerCommand('replicated.testInEnvironmentDirect', async (environment: string) => {
+		await vscode.window.withProgress({
+			location: vscode.ProgressLocation.Notification,
+			title: `Testing in ${environment}...`,
+			cancellable: false
+		}, async (progress) => {
+			// Simulate testing process
+			await new Promise(resolve => setTimeout(resolve, 2000));
+		});
+		
+		vscode.window.showInformationMessage(`Deployed to ${environment} environment successfully!`);
+	});
+	
+	// Show Cluster Resources Dashboard
+	let d14 = vscode.commands.registerCommand('replicated.showClusterResources', () => {
+		ClusterDashboardPanel.createOrShow(context.extensionUri);
+	});
+
+	// Open documentation URL
+	let d15 = vscode.commands.registerCommand('replicated.openDocs', (item: any) => {
+		if (item && item.docsUrl) {
+			vscode.env.openExternal(vscode.Uri.parse(item.docsUrl));
+		}
+	});
+
 	// Run CLI command in terminal
-	let d15 = vscode.commands.registerCommand('replicated.runCLICommand', async (command: string) => {
+	let d16 = vscode.commands.registerCommand('replicated.runCLICommand', async (command: string) => {
 		if (!command) {
 			vscode.window.showErrorMessage('No command provided');
 			return;
@@ -206,64 +268,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}, 5000); // Wait 5 seconds for brew commands to complete
 	});
 
-	// Check CLI status
-	let d10 = vscode.commands.registerCommand('replicated.checkCLI', async () => {
-		cliService.clearCache();
-		await devActionsViewProvider.updateCLIStatus();
-		const status = await cliService.checkCLIStatus();
-		
-		if (status.installed) {
-			vscode.window.showInformationMessage(`Replicated CLI is installed. Version: ${status.version}`);
-		} else {
-			vscode.window.showWarningMessage('Replicated CLI is not installed.');
-		}
-	});
-
-	// Toggle auto-lint
-	let d11 = vscode.commands.registerCommand('replicated.toggleAutoLint', async () => {
-		if (enableOnSave) {
-			// Disable auto-lint
-			diagnosticCollection.clear();
-			enableOnSave = false;
-			devActionsViewProvider.setAutoLintEnabled(false);
-			manifestsViewProvider.refresh();
-		} else {
-			// Enable auto-lint
-			diagnosticCollection.clear();
-			enableOnSave = true;
-			devActionsViewProvider.setAutoLintEnabled(true);
-			manifestsViewProvider.markLintAsRun();
-			await lintService.lintWorkspace(diagnosticCollection);
-		}
-	});
-
-	// Test in Environment with direct environment selection
-	let d12 = vscode.commands.registerCommand('replicated.testInEnvironmentDirect', async (environment: string) => {
-		await vscode.window.withProgress({
-			location: vscode.ProgressLocation.Notification,
-			title: `Testing in ${environment}...`,
-			cancellable: false
-		}, async (progress) => {
-			// Simulate testing process
-			await new Promise(resolve => setTimeout(resolve, 2000));
-		});
-		
-		vscode.window.showInformationMessage(`Deployed to ${environment} environment successfully!`);
-	});
-	
-	// Show Cluster Resources Dashboard
-	let d13 = vscode.commands.registerCommand('replicated.showClusterResources', () => {
-		ClusterDashboardPanel.createOrShow(context.extensionUri);
-	});
-
-	// Open documentation URL
-	let d14 = vscode.commands.registerCommand('replicated.openDocs', (item: any) => {
-		if (item && item.docsUrl) {
-			vscode.env.openExternal(vscode.Uri.parse(item.docsUrl));
-		}
-	});
-
-	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15);
+	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15, d16);
 }
 
 export function deactivate() {}

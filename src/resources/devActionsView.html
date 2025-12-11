@@ -6,10 +6,10 @@
     <style>
         /* CSS Variables */
         :root {
-            --toggle-height: 18px;
-            --toggle-width: 36px;
-            --toggle-slider-size: 12px;
-            --toggle-slider-offset: 3px;
+            --toggle-height: 16px;
+            --toggle-width: 30px;
+            --toggle-slider-size: calc(var(--toggle-height) - 4px);
+            --toggle-slider-offset: 2px;
             --toggle-slider-translate: calc(var(--toggle-width) - var(--toggle-slider-size) - calc(var(--toggle-slider-offset) * 2));
         }
 
@@ -43,7 +43,7 @@
             gap: 12px;
             flex: 1 1 0;
             min-height: 0;
-            overflow: hidden;
+            overflow: visible;
         }
 
         .dev-section {
@@ -51,8 +51,7 @@
             min-height: 0;
             display: flex;
             flex-direction: column;
-            overflow-x: hidden;
-            overflow-y: auto;
+            overflow: visible;
         }
 
         .section-divider {
@@ -235,6 +234,7 @@
             flex-shrink: 0;
             opacity: 0;
             transition: opacity 0.15s ease-out;
+            color: var(--vscode-descriptionForeground);
         }
 
         .custom-select-icon.show {
@@ -304,6 +304,7 @@
             width: 16px;
             height: 16px;
             flex-shrink: 0;
+            color: var(--vscode-descriptionForeground);
         }
 
         /* Info Row with Label (used for CLI status and button labels) */
@@ -320,7 +321,7 @@
             height: 16px;
             flex-shrink: 0;
             transition: color 0.2s ease;
-            color: var(--vscode-foreground);
+            color: var(--vscode-descriptionForeground);
         }
 
         .info-icon.unknown {
@@ -328,11 +329,11 @@
         }
 
         .info-icon.white {
-            color: #ffffff;
+            color: var(--vscode-descriptionForeground);
         }
 
         .info-icon.installed {
-            color: var(--vscode-foreground);
+            color: var(--vscode-descriptionForeground);
         }
 
         .info-label {
@@ -441,75 +442,55 @@
             flex-shrink: 0;
         }
 
-        /* CMX Info Container with Tooltip */
-        .cmx-info-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            position: relative;
-            cursor: pointer;
-            user-select: none;
-            transition: opacity 0.1s ease;
-            z-index: 1;
-        }
-
-        .cmx-info-container:hover {
-            opacity: 0.9;
-        }
-
-        .cmx-info-container:hover .info-icon,
-        .cmx-info-container:hover .info-label {
-            color: white;
-        }
-
-        .cmx-info-container:focus-visible {
-            outline: 1px solid var(--vscode-focusBorder);
-            outline-offset: 2px;
-            border-radius: 2px;
-        }
-
-        .cmx-tooltip {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            margin-top: 8px;
-            padding: 8px 12px;
-            background-color: var(--vscode-editorWidget-background);
-            border: 1px solid var(--vscode-editorWidget-border);
-            border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-            color: var(--vscode-editorWidget-foreground);
+        /* CMX Description */
+        .cmx-description {
+            text-align: center;
             font-size: 12px;
             line-height: 1.5;
-            min-width: 250px;
-            max-width: min(450px, calc(100vw - 100px));
-            width: min(450px, calc(100vw - 100px));
-            white-space: normal;
-            z-index: 1000;
-            opacity: 0;
-            transform: translateY(4px) scale(0.98);
-            pointer-events: none;
-            transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 12px;
+            padding: 0 8px;
         }
 
-        .cmx-tooltip.show {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-            pointer-events: auto;
-        }
-
-        .cmx-tooltip-text {
-            margin-bottom: 8px;
-        }
-
-        .cmx-tooltip-link {
+        .cmx-link {
             color: var(--vscode-textLink-foreground);
             text-decoration: underline;
             cursor: pointer;
         }
 
-        .cmx-tooltip-link:hover {
+        .cmx-link:hover {
             color: var(--vscode-textLink-activeForeground);
+        }
+
+        /* Login Status Row */
+        .login-status-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            justify-content: flex-end;
+            min-width: 0;
+        }
+
+        .login-action-link {
+            color: var(--vscode-textLink-foreground);
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .login-action-link:hover {
+            color: var(--vscode-textLink-activeForeground);
+        }
+
+        #loginStatusText {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            white-space: nowrap;
+        }
+
+        #loginStatusAction {
+            flex-shrink: 0;
         }
 
     </style>
@@ -519,24 +500,6 @@
         <!-- Dev Section -->
         <div class="dev-section">
             <div class="select-group">
-                <div class="cmx-info-container" 
-                     id="cmxInfoContainer"
-                     role="button"
-                     tabindex="0"
-                     aria-label="CMX - Compatibility Matrix. Click to open documentation">
-                    <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                        <path d="M3 3v5h5"/>
-                        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
-                        <path d="M16 16h5v5"/>
-                    </svg>
-                    <span class="info-label">CMX</span>
-                    <div class="cmx-tooltip" id="cmxTooltip">
-                        <div class="cmx-tooltip-text">
-                            Compatibility Matrix (CMX) offers ephemeral VMs and clusters to test your application. CMX offers a range of environments, from simple test environments to realistic environments that simulate common enterprise scenarios. (Click for Docs)
-                        </div>
-                    </div>
-                </div>
                 <div class="select-wrapper">
                     <button class="custom-select" id="customSelectBtn" type="button">
                         <svg class="custom-select-icon" id="selectedIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -557,17 +520,16 @@
                             </svg>
                             <span>k3s • 3 node • Ubuntu</span>
                         </button>
-                        <button class="custom-dropdown-item" data-value="kind-1node" data-text="kind • 1 node • Ubuntu">
-                            <span class="custom-dropdown-item-icon"></span>
-                            <span>kind • 1 node • Ubuntu</span>
-                        </button>
                         <button class="custom-dropdown-item" data-value="custom" data-text="Custom">
                             <span class="custom-dropdown-item-icon"></span>
-                            <span>Custom</span>
+                            <span>Custom…</span>
                         </button>
                     </div>
                 </div>
                 <button class="btn btn-primary" id="testEnvBtn">Go</button>
+            </div>
+            <div class="cmx-description">
+                Compatibility Matrix (CMX) offers ephemeral VMs and clusters to test your application. (<a href="#" class="cmx-link" id="cmxLearnMoreLink">Docs</a>)
             </div>
         </div>
 
@@ -580,8 +542,10 @@
                 <!-- Code Sync into CMX environment -->
                 <li class="settings-row">
                     <div class="info-row">
-                        <img src="{{CHECK_ICON_URI}}" class="info-icon white" alt="Check" aria-hidden="true" />
-                        <span class="info-label">Code Sync into CMX environment</span>
+                        <svg class="info-icon" id="codeSyncIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
+                        </svg>
+                        <span class="info-label">Dev Mode for CMX</span>
                         <label class="toggle-switch" for="codeSyncToggle" aria-label="Toggle code sync into CMX environment">
                             <input type="checkbox" id="codeSyncToggle" />
                             <span class="toggle-slider"></span>
@@ -592,7 +556,9 @@
                 <!-- Auto-lint -->
                 <li class="settings-row">
                     <div class="info-row">
-                        <img src="{{CHECK_ICON_URI}}" class="info-icon white" alt="Check" aria-hidden="true" />
+                        <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M20 6L9 17l-5-5"/>
+                        </svg>
                         <span class="info-label">Auto-lint</span>
                         <label class="toggle-switch" for="autoLintToggle" aria-label="Toggle auto-lint">
                             <input type="checkbox" id="autoLintToggle" />
@@ -612,6 +578,22 @@
                         <div class="cli-status-right">
                             <span id="cliVersion">Checking…</span>
                             <span id="cliStatus"></span>
+                        </div>
+                    </div>
+                </li>
+
+                <!-- Login Status -->
+                <li class="settings-row">
+                    <div class="info-row">
+                        <svg class="info-icon unknown" id="loginStatusIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                            <polyline points="10 17 15 12 10 7"/>
+                            <line x1="15" y1="12" x2="3" y2="12"/>
+                        </svg>
+                        <span class="info-label">Replicated Account</span>
+                        <div class="login-status-right">
+                            <span id="loginStatusText">Checking…</span>
+                            <span id="loginStatusAction"></span>
                         </div>
                     </div>
                 </li>
@@ -635,6 +617,7 @@
         // DOM Elements (cached for performance)
         const elements = {
             codeSyncToggle: document.getElementById('codeSyncToggle'),
+            codeSyncIcon: document.getElementById('codeSyncIcon'),
             autoLintToggle: document.getElementById('autoLintToggle'),
             testEnvBtn: document.getElementById('testEnvBtn'),
             customSelectBtn: document.getElementById('customSelectBtn'),
@@ -645,8 +628,9 @@
             cliIcon: document.getElementById('cliIcon'),
             cliVersion: document.getElementById('cliVersion'),
             cliStatus: document.getElementById('cliStatus'),
-            cmxInfoContainer: document.getElementById('cmxInfoContainer'),
-            cmxTooltip: document.getElementById('cmxTooltip')
+            loginStatusIcon: document.getElementById('loginStatusIcon'),
+            loginStatusText: document.getElementById('loginStatusText'),
+            loginStatusAction: document.getElementById('loginStatusAction')
         };
 
         // Current selected value
@@ -711,8 +695,65 @@
             // Otherwise empty (checking or not found states)
         };
 
+        // Login Status Feature
+        const updateLoginDisplay = (loggedIn, error) => {
+            const iconEl = elements.loginStatusIcon;
+            const textEl = elements.loginStatusText;
+            const actionEl = elements.loginStatusAction;
+            
+            // Clear previous action
+            actionEl.innerHTML = '';
+            
+            if (loggedIn === undefined) {
+                // Checking state
+                iconEl.className = 'info-icon unknown';
+                textEl.textContent = 'Checking…';
+            } else if (error === 'CLI not installed') {
+                // CLI not installed
+                iconEl.className = 'info-icon unknown';
+                textEl.textContent = 'CLI not found';
+            } else if (loggedIn) {
+                // Logged in
+                iconEl.className = 'info-icon installed';
+                textEl.textContent = 'Logged in';
+                
+                // Add logout link
+                const logoutLink = document.createElement('a');
+                logoutLink.href = '#';
+                logoutLink.className = 'login-action-link';
+                logoutLink.textContent = 'Logout';
+                logoutLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    postMessage('logout');
+                    // Show checking state
+                    updateLoginDisplay(undefined);
+                });
+                actionEl.appendChild(logoutLink);
+            } else {
+                // Not logged in
+                iconEl.className = 'info-icon unknown';
+                textEl.textContent = 'Not logged in';
+                
+                // Add login button
+                const loginBtn = document.createElement('button');
+                loginBtn.className = 'btn btn-secondary';
+                loginBtn.textContent = 'Login';
+                loginBtn.addEventListener('click', () => {
+                    postMessage('login');
+                    // Show checking state
+                    updateLoginDisplay(undefined);
+                });
+                actionEl.appendChild(loginBtn);
+            }
+        };
+
         // Code Sync Feature
         const toggleCodeSync = () => {
+            // Update icon color immediately based on toggle state
+            const isEnabled = elements.codeSyncToggle?.checked ?? false;
+            if (elements.codeSyncIcon) {
+                elements.codeSyncIcon.style.stroke = isEnabled ? '#51E9F0' : 'currentColor';
+            }
             postMessage('toggleCodeSync');
         };
 
@@ -720,6 +761,10 @@
             state.codeSyncEnabled = enabled;
             if (elements.codeSyncToggle) {
                 elements.codeSyncToggle.checked = enabled;
+            }
+            // Update icon color to cyberMint when enabled
+            if (elements.codeSyncIcon) {
+                elements.codeSyncIcon.style.stroke = enabled ? '#51E9F0' : 'currentColor';
             }
         };
 
@@ -760,18 +805,6 @@
             toggleClass(elements.selectedIcon, 'show', isK3s);
         };
 
-        // CMX Info Container handlers
-        const showCMXTooltip = () => {
-            elements.cmxTooltip?.classList.add('show');
-        };
-
-        const hideCMXTooltip = () => {
-            elements.cmxTooltip?.classList.remove('show');
-        };
-
-        const openCMXDocs = () => {
-            postMessage('openExternal', { url: 'https://docs.replicated.com/vendor/testing-about' });
-        };
 
         // Event Listeners Setup
         const setupEventListeners = () => {
@@ -818,25 +851,14 @@
             // Initialize selected display
             updateSelectedDisplay();
 
-            // CMX info container hover and click handlers
-            if (elements.cmxInfoContainer) {
-                elements.cmxInfoContainer.addEventListener('mouseenter', showCMXTooltip);
-                elements.cmxInfoContainer.addEventListener('mouseleave', hideCMXTooltip);
-                elements.cmxInfoContainer.addEventListener('click', openCMXDocs);
-                elements.cmxInfoContainer.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        openCMXDocs();
-                    }
+            // CMX Learn More link
+            const cmxLearnMoreLink = document.getElementById('cmxLearnMoreLink');
+            if (cmxLearnMoreLink) {
+                cmxLearnMoreLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    postMessage('openExternal', { url: 'https://docs.replicated.com/vendor/testing-about' });
                 });
-                elements.cmxInfoContainer.addEventListener('focus', showCMXTooltip);
-                elements.cmxInfoContainer.addEventListener('blur', hideCMXTooltip);
             }
-
-            // Update tooltip width on resize (sidebar width changes)
-            window.addEventListener('resize', updateTooltipWidth);
-            // Initial tooltip width update
-            updateTooltipWidth();
 
             // Message handler from extension
             window.addEventListener('message', handleMessage);
@@ -844,7 +866,7 @@
 
         // Message Handler
         const handleMessage = (event) => {
-            const { type, enabled, installed, version, updateAvailable, latestVersion } = event.data;
+            const { type, enabled, installed, version, updateAvailable, latestVersion, loggedIn, error } = event.data;
 
             switch (type) {
                 case 'updateCodeSync':
@@ -856,11 +878,20 @@
                 case 'updateCLI':
                     updateCLIDisplay(installed, version, updateAvailable, latestVersion);
                     break;
+                case 'updateLogin':
+                    updateLoginDisplay(loggedIn, error);
+                    break;
             }
         };
 
         // Initialize
         setupEventListeners();
+        
+        // Initialize icon color based on initial toggle state
+        if (elements.codeSyncIcon && elements.codeSyncToggle) {
+            const isEnabled = elements.codeSyncToggle.checked;
+            elements.codeSyncIcon.style.stroke = isEnabled ? '#51E9F0' : 'currentColor';
+        }
     </script>
 </body>
 </html>

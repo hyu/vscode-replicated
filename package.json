@@ -16,9 +16,7 @@
     "theme": "dark"
   },
   "activationEvents": [
-    "onStartupFinished",
-    "onView:replicatedManifests",
-    "onView:replicatedActions"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
