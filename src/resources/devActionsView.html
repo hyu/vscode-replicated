@@ -35,6 +35,8 @@
             height: 100%;
             width: 100%;
             overflow: hidden;
+            /* Minimum height to ensure all elements remain visible when collapsed */
+            min-height: 280px;
         }
 
         .container {
@@ -48,10 +50,11 @@
 
         .dev-section {
             flex: 1 1 0;
-            min-height: 0;
             display: flex;
             flex-direction: column;
             overflow: visible;
+            /* Minimum height to ensure select group and description remain visible */
+            min-height: 100px;
         }
 
         .section-divider {
@@ -452,6 +455,15 @@
             padding: 0 8px;
         }
 
+        .dev-mode-description {
+            text-align: center;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 8px;
+            padding: 0 8px;
+        }
+
         .cmx-link {
             color: var(--vscode-textLink-foreground);
             text-decoration: underline;
@@ -530,6 +542,9 @@
             </div>
             <div class="cmx-description">
                 Compatibility Matrix (CMX) offers ephemeral VMs and clusters to test your application. (<a href="#" class="cmx-link" id="cmxLearnMoreLink">Docs</a>)
+            </div>
+            <div class="dev-mode-description" id="devModeDescription" style="display: none;">
+                Dev Mode code syncs your edits to a running cluster.
             </div>
         </div>
 
@@ -618,6 +633,7 @@
         const elements = {
             codeSyncToggle: document.getElementById('codeSyncToggle'),
             codeSyncIcon: document.getElementById('codeSyncIcon'),
+            devModeDescription: document.getElementById('devModeDescription'),
             autoLintToggle: document.getElementById('autoLintToggle'),
             testEnvBtn: document.getElementById('testEnvBtn'),
             customSelectBtn: document.getElementById('customSelectBtn'),
@@ -754,6 +770,10 @@
             if (elements.codeSyncIcon) {
                 elements.codeSyncIcon.style.stroke = isEnabled ? '#51E9F0' : 'currentColor';
             }
+            // Show/hide dev mode description immediately
+            if (elements.devModeDescription) {
+                elements.devModeDescription.style.display = isEnabled ? 'block' : 'none';
+            }
             postMessage('toggleCodeSync');
         };
 
@@ -765,6 +785,10 @@
             // Update icon color to cyberMint when enabled
             if (elements.codeSyncIcon) {
                 elements.codeSyncIcon.style.stroke = enabled ? '#51E9F0' : 'currentColor';
+            }
+            // Show/hide dev mode description
+            if (elements.devModeDescription) {
+                elements.devModeDescription.style.display = enabled ? 'block' : 'none';
             }
         };
 
@@ -887,10 +911,15 @@
         // Initialize
         setupEventListeners();
         
-        // Initialize icon color based on initial toggle state
-        if (elements.codeSyncIcon && elements.codeSyncToggle) {
+        // Initialize icon color and dev mode description based on initial toggle state
+        if (elements.codeSyncToggle) {
             const isEnabled = elements.codeSyncToggle.checked;
-            elements.codeSyncIcon.style.stroke = isEnabled ? '#51E9F0' : 'currentColor';
+            if (elements.codeSyncIcon) {
+                elements.codeSyncIcon.style.stroke = isEnabled ? '#51E9F0' : 'currentColor';
+            }
+            if (elements.devModeDescription) {
+                elements.devModeDescription.style.display = isEnabled ? 'block' : 'none';
+            }
         }
     </script>
 </body>
