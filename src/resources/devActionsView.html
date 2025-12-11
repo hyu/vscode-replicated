@@ -4,36 +4,157 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        /* CSS Variables */
+        :root {
+            --toggle-height: 18px;
+            --toggle-width: 36px;
+            --toggle-slider-size: 12px;
+            --toggle-slider-offset: 3px;
+            --toggle-slider-translate: calc(var(--toggle-width) - var(--toggle-slider-size) - calc(var(--toggle-slider-offset) * 2));
+        }
+
+        /* Base Styles */
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            height: 100%;
+            width: 100%;
+        }
+
         body {
             padding: 16px 12px;
             font-family: var(--vscode-font-family);
             font-size: var(--vscode-font-size);
             color: var(--vscode-foreground);
             line-height: 1.5;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
         }
+
         .container {
             display: flex;
             flex-direction: column;
             gap: 12px;
+            flex: 1 1 0;
+            min-height: 0;
+            overflow: hidden;
         }
-        
-        /* Checkbox - Following VS Code design system */
+
+        .dev-section {
+            flex: 1 1 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .section-divider {
+            height: 1px;
+            background-color: var(--vscode-panel-border);
+            margin: 12px 0;
+            flex-shrink: 0;
+        }
+
+        .settings-section {
+            flex: 0 0 auto;
+        }
+
+        .settings-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .settings-row {
+            display: flex;
+            align-items: center;
+            padding: 0;
+        }
+
+        /* Shared Interactive States */
+        .interactive {
+            cursor: pointer;
+            user-select: none;
+            outline: none;
+            transition: all 0.1s ease;
+        }
+
+        .interactive:hover {
+            opacity: 0.9;
+        }
+
+        .interactive:focus-visible {
+            outline: 1px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+        }
+
+        /* Shared Button Base */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            font-family: var(--vscode-font-family);
+            transition: background-color 0.1s ease;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        .btn-secondary {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: var(--vscode-button-secondaryHoverBackground);
+        }
+
+        .btn-icon {
+            background: transparent;
+            color: var(--vscode-icon-foreground);
+            padding: 4px;
+            font-size: 14px;
+        }
+
+        .btn-icon:hover:not(:disabled) {
+            background-color: var(--vscode-toolbar-hoverBackground);
+        }
+
+        /* Checkbox Component */
         .checkbox-container {
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 4px 0;
-            cursor: pointer;
-            user-select: none;
-            outline: none;
         }
-        .checkbox-container:hover .checkbox {
-            border-color: var(--vscode-focusBorder);
-        }
-        .checkbox-container:focus-within .checkbox {
-            outline: 1px solid var(--vscode-focusBorder);
-            outline-offset: 2px;
-        }
+
         .checkbox {
             width: 18px;
             height: 18px;
@@ -44,13 +165,17 @@
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            transition: all 0.1s ease;
             position: relative;
         }
-        .checkbox.checked {
-            background-color: var(--vscode-checkbox-background);
+
+        .checkbox-container:hover .checkbox {
             border-color: var(--vscode-focusBorder);
         }
+
+        .checkbox.checked {
+            border-color: var(--vscode-focusBorder);
+        }
+
         .checkbox.checked::after {
             content: '✓';
             color: var(--vscode-checkbox-foreground);
@@ -58,60 +183,82 @@
             font-weight: bold;
             line-height: 1;
         }
+
         .checkbox-label {
             font-size: 13px;
-            color: var(--vscode-foreground);
         }
-        
-        /* Button with dropdown */
-        .button-group {
+
+        /* Custom Select Menu with Icons */
+        .select-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            position: relative;
+            overflow: visible;
+        }
+
+        .select-wrapper {
+            flex: 1;
             position: relative;
         }
-        .button-with-dropdown {
-            display: flex;
+
+        .custom-select {
             width: 100%;
-            border-radius: 2px;
-            overflow: hidden;
-            border: 1px solid transparent;
-        }
-        .button-with-dropdown:hover {
-            border-color: var(--vscode-button-hoverBackground);
-        }
-        .button-main {
-            flex: 1;
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
             padding: 6px 12px;
-            cursor: pointer;
-            font-size: 13px;
+            padding-right: 28px;
+            background-color: var(--vscode-dropdown-background);
+            border: 1px solid var(--vscode-dropdown-border);
+            border-radius: 2px;
+            color: var(--vscode-foreground);
             font-family: var(--vscode-font-family);
-            text-align: left;
+            font-size: 13px;
+            cursor: pointer;
             display: flex;
             align-items: center;
             gap: 6px;
+            transition: border-color 0.1s ease, background-color 0.1s ease;
         }
-        .button-main:hover {
-            background-color: var(--vscode-button-hoverBackground);
+
+        .custom-select:hover {
+            background-color: var(--vscode-list-hoverBackground);
         }
-        .button-dropdown {
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            border-left: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 6px 8px;
-            cursor: pointer;
-            font-size: 11px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+
+        .custom-select:focus {
+            outline: 1px solid var(--vscode-focusBorder);
+            outline-offset: -1px;
         }
-        .button-dropdown:hover {
-            background-color: var(--vscode-button-hoverBackground);
+
+        .custom-select-icon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            opacity: 0;
+            transition: opacity 0.15s ease-out;
         }
-        
-        .dropdown-menu {
-            display: none;
+
+        .custom-select-icon.show {
+            opacity: 1;
+        }
+
+        .custom-select-text {
+            flex: 1;
+            text-align: left;
+        }
+
+        .select-wrapper::after {
+            content: '▼';
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: var(--vscode-foreground);
+            font-size: 10px;
+            opacity: 0.7;
+        }
+
+        .custom-dropdown-menu {
             position: absolute;
             top: 100%;
             left: 0;
@@ -123,11 +270,19 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
             z-index: 1000;
             overflow: hidden;
+            opacity: 0;
+            transform: translateY(-4px) scale(0.98);
+            pointer-events: none;
+            transition: opacity 0.15s ease-out, transform 0.15s ease-out;
         }
-        .dropdown-menu.show {
-            display: block;
+
+        .custom-dropdown-menu.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
         }
-        .dropdown-item {
+
+        .custom-dropdown-item {
             padding: 8px 12px;
             cursor: pointer;
             font-size: 13px;
@@ -136,319 +291,576 @@
             color: var(--vscode-dropdown-foreground);
             text-align: left;
             width: 100%;
-        }
-        .dropdown-item:hover {
-            background-color: var(--vscode-list-hoverBackground);
-        }
-        
-        /* CLI Status */
-        .cli-status {
-            margin-top: 8px;
-            padding-top: 12px;
-            border-top: 1px solid var(--vscode-panel-border);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .cli-info-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            flex-wrap: nowrap;
-        }
-        .cli-icon {
-            width: 16px;
-            height: 16px;
-            flex-shrink: 0;
-            stroke: currentColor;
-            color: var(--vscode-descriptionForeground);
-        }
-        .cli-icon.unknown {
-            color: var(--vscode-descriptionForeground);
-        }
-        .cli-icon.installed {
-            color: var(--vscode-foreground);
-        }
-        .cli-label {
-            color: var(--vscode-foreground);
-            font-weight: 500;
-            flex-shrink: 0;
-        }
-        .cli-version {
-            color: var(--vscode-descriptionForeground);
-            flex-shrink: 0;
-        }
-        .cli-status-button {
-            background-color: transparent;
-            border: none;
-            color: var(--vscode-descriptionForeground);
-            font-size: 12px;
-            font-family: var(--vscode-font-family);
-            padding: 2px 6px;
-            cursor: default;
-            margin-left: auto;
-            flex-shrink: 0;
-        }
-        .cli-status-button:disabled {
-            opacity: 0.7;
-        }
-        .cli-actions {
             display: flex;
             align-items: center;
             gap: 6px;
         }
-        .cli-button {
-            background-color: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
-            border: none;
-            padding: 4px 10px;
-            border-radius: 2px;
-            cursor: pointer;
+
+        .custom-dropdown-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .custom-dropdown-item-icon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        /* Info Row with Label (used for CLI status and button labels) */
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
             font-size: 12px;
-            font-family: var(--vscode-font-family);
+            width: 100%;
+        }
+
+        .info-icon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            transition: color 0.2s ease;
+            color: var(--vscode-foreground);
+        }
+
+        .info-icon.unknown {
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .info-icon.white {
+            color: #ffffff;
+        }
+
+        .info-icon.installed {
+            color: var(--vscode-foreground);
+        }
+
+        .info-label {
+            font-weight: 500;
+            flex-shrink: 0;
+            transition: color 0.2s ease;
+        }
+
+
+        .cli-status-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+            color: var(--vscode-descriptionForeground);
+            font-size: 12px;
+        }
+
+        .settings-status-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+            color: var(--vscode-descriptionForeground);
+            font-size: 12px;
+        }
+
+        .settings-status-right.interactive {
+            cursor: pointer;
+            color: var(--vscode-foreground);
+        }
+
+        .settings-status-right.interactive:hover {
+            opacity: 0.9;
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            width: var(--toggle-width);
+            height: var(--toggle-height);
             margin-left: auto;
             flex-shrink: 0;
         }
-        .cli-button:hover {
-            background-color: var(--vscode-button-secondaryHoverBackground);
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
         }
-        .cli-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .icon-button {
-            background: transparent;
-            border: none;
-            color: var(--vscode-icon-foreground);
+
+        .toggle-slider {
+            position: absolute;
             cursor: pointer;
-            padding: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 3px;
-            font-size: 14px;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--vscode-checkbox-border);
+            transition: 0.2s;
+            border-radius: var(--toggle-height);
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: var(--toggle-slider-size);
+            width: var(--toggle-slider-size);
+            left: var(--toggle-slider-offset);
+            bottom: var(--toggle-slider-offset);
+            background-color: var(--vscode-checkbox-background);
+            transition: 0.2s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: var(--vscode-button-background);
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(var(--toggle-slider-translate));
+        }
+
+        .toggle-switch:focus-within .toggle-slider {
+            outline: 1px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+        }
+
+        .codicon {
+            font-family: codicon;
+            font-size: 16px;
+            line-height: 1;
+            display: inline-block;
+        }
+
+        /* Utility Classes */
+        .hidden {
+            display: none !important;
+        }
+
+        .ml-auto {
+            margin-left: auto;
+        }
+
+        .flex-shrink-0 {
             flex-shrink: 0;
         }
-        .icon-button:hover {
-            background-color: var(--vscode-toolbar-hoverBackground);
+
+        /* CMX Info Container with Tooltip */
+        .cmx-info-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            transition: opacity 0.1s ease;
+            z-index: 1;
         }
-        .icon-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+
+        .cmx-info-container:hover {
+            opacity: 0.9;
         }
+
+        .cmx-info-container:hover .info-icon,
+        .cmx-info-container:hover .info-label {
+            color: white;
+        }
+
+        .cmx-info-container:focus-visible {
+            outline: 1px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+            border-radius: 2px;
+        }
+
+        .cmx-tooltip {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background-color: var(--vscode-editorWidget-background);
+            border: 1px solid var(--vscode-editorWidget-border);
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            color: var(--vscode-editorWidget-foreground);
+            font-size: 12px;
+            line-height: 1.5;
+            min-width: 250px;
+            max-width: min(450px, calc(100vw - 100px));
+            width: min(450px, calc(100vw - 100px));
+            white-space: normal;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(4px) scale(0.98);
+            pointer-events: none;
+            transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+        }
+
+        .cmx-tooltip.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .cmx-tooltip-text {
+            margin-bottom: 8px;
+        }
+
+        .cmx-tooltip-link {
+            color: var(--vscode-textLink-foreground);
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        .cmx-tooltip-link:hover {
+            color: var(--vscode-textLink-activeForeground);
+        }
+
     </style>
 </head>
 <body>
     <div class="container">
-        
-        <!-- Test in Environment button with dropdown -->
-        <div class="button-group">
-            <div class="button-with-dropdown">
-                <button class="button-main" onclick="testInEnvironment()">
-                    <span>🚀</span>
-                    <span>Test in Environment</span>
-                </button>
-                <button class="button-dropdown" onclick="toggleDropdown()">▼</button>
-            </div>
-            <div class="dropdown-menu" id="envDropdown">
-                <button class="dropdown-item" onclick="testInEnvironment('development')">Development</button>
-                <button class="dropdown-item" onclick="testInEnvironment('staging')">Staging</button>
-                <button class="dropdown-item" onclick="testInEnvironment('production')">Production</button>
+        <!-- Dev Section -->
+        <div class="dev-section">
+            <div class="select-group">
+                <div class="cmx-info-container" 
+                     id="cmxInfoContainer"
+                     role="button"
+                     tabindex="0"
+                     aria-label="CMX - Compatibility Matrix. Click to open documentation">
+                    <svg class="info-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+                        <path d="M16 16h5v5"/>
+                    </svg>
+                    <span class="info-label">CMX</span>
+                    <div class="cmx-tooltip" id="cmxTooltip">
+                        <div class="cmx-tooltip-text">
+                            Compatibility Matrix (CMX) offers ephemeral VMs and clusters to test your application. CMX offers a range of environments, from simple test environments to realistic environments that simulate common enterprise scenarios. (Click for Docs)
+                        </div>
+                    </div>
+                </div>
+                <div class="select-wrapper">
+                    <button class="custom-select" id="customSelectBtn" type="button">
+                        <svg class="custom-select-icon" id="selectedIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M21.46 2.172H2.54A2.548 2.548 0 0 0 0 4.712v14.575a2.548 2.548 0 0 0 2.54 2.54h18.92a2.548 2.548 0 0 0 2.54-2.54V4.713a2.548 2.548 0 0 0-2.54-2.54ZM10.14 16.465 5.524 19.15a1.235 1.235 0 1 1-1.242-2.137L8.9 14.33a1.235 1.235 0 1 1 1.241 2.136zm1.817-4.088h-.006a1.235 1.235 0 0 1-1.23-1.24l.023-5.32a1.236 1.236 0 0 1 1.236-1.23h.005a1.235 1.235 0 0 1 1.23 1.241l-.023 5.32a1.236 1.236 0 0 1-1.235 1.23zm8.17 6.32a1.235 1.235 0 0 1-1.688.453l-4.624-2.67a1.235 1.235 0 1 1 1.235-2.14l4.624 2.67a1.235 1.235 0 0 1 .452 1.688z"/>
+                        </svg>
+                        <span class="custom-select-text" id="selectedText">k3s • 1 node • Ubuntu</span>
+                    </button>
+                    <div class="custom-dropdown-menu" id="customDropdown">
+                        <button class="custom-dropdown-item" data-value="k3s-1node" data-text="k3s • 1 node • Ubuntu">
+                            <svg class="custom-dropdown-item-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M21.46 2.172H2.54A2.548 2.548 0 0 0 0 4.712v14.575a2.548 2.548 0 0 0 2.54 2.54h18.92a2.548 2.548 0 0 0 2.54-2.54V4.713a2.548 2.548 0 0 0-2.54-2.54ZM10.14 16.465 5.524 19.15a1.235 1.235 0 1 1-1.242-2.137L8.9 14.33a1.235 1.235 0 1 1 1.241 2.136zm1.817-4.088h-.006a1.235 1.235 0 0 1-1.23-1.24l.023-5.32a1.236 1.236 0 0 1 1.236-1.23h.005a1.235 1.235 0 0 1 1.23 1.241l-.023 5.32a1.236 1.236 0 0 1-1.235 1.23zm8.17 6.32a1.235 1.235 0 0 1-1.688.453l-4.624-2.67a1.235 1.235 0 1 1 1.235-2.14l4.624 2.67a1.235 1.235 0 0 1 .452 1.688z"/>
+                            </svg>
+                            <span>k3s • 1 node • Ubuntu</span>
+                        </button>
+                        <button class="custom-dropdown-item" data-value="k3s-3node" data-text="k3s • 3 node • Ubuntu">
+                            <svg class="custom-dropdown-item-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M21.46 2.172H2.54A2.548 2.548 0 0 0 0 4.712v14.575a2.548 2.548 0 0 0 2.54 2.54h18.92a2.548 2.548 0 0 0 2.54-2.54V4.713a2.548 2.548 0 0 0-2.54-2.54ZM10.14 16.465 5.524 19.15a1.235 1.235 0 1 1-1.242-2.137L8.9 14.33a1.235 1.235 0 1 1 1.241 2.136zm1.817-4.088h-.006a1.235 1.235 0 0 1-1.23-1.24l.023-5.32a1.236 1.236 0 0 1 1.236-1.23h.005a1.235 1.235 0 0 1 1.23 1.241l-.023 5.32a1.236 1.236 0 0 1-1.235 1.23zm8.17 6.32a1.235 1.235 0 0 1-1.688.453l-4.624-2.67a1.235 1.235 0 1 1 1.235-2.14l4.624 2.67a1.235 1.235 0 0 1 .452 1.688z"/>
+                            </svg>
+                            <span>k3s • 3 node • Ubuntu</span>
+                        </button>
+                        <button class="custom-dropdown-item" data-value="kind-1node" data-text="kind • 1 node • Ubuntu">
+                            <span class="custom-dropdown-item-icon"></span>
+                            <span>kind • 1 node • Ubuntu</span>
+                        </button>
+                        <button class="custom-dropdown-item" data-value="custom" data-text="Custom">
+                            <span class="custom-dropdown-item-icon"></span>
+                            <span>Custom</span>
+                        </button>
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="testEnvBtn">Go</button>
             </div>
         </div>
 
+        <!-- Section Divider -->
+        <div class="section-divider"></div>
 
-                <!-- Auto-lint checkbox -->
-                <div class="checkbox-container" 
-                role="checkbox" 
-                aria-checked="false" 
-                aria-label="Auto-lint on save"
-                tabindex="0"
-                id="autoLintContainer"
-                onclick="toggleAutoLint()"
-                onkeydown="handleCheckboxKeydown(event)">
-               <div class="checkbox" id="autoLintCheckbox" aria-hidden="true"></div>
-               <span class="checkbox-label">Auto-lint on save</span>
-           </div>
-   
-        
-        <!-- CLI Status -->
-        <div class="cli-status">
-            <div class="cli-info-row">
-                <svg class="cli-icon unknown" id="cliIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 19h8"/>
-                    <path d="m4 17 6-6-6-6"/>
-                </svg>
-                <span class="cli-label">Replicated CLI</span>
-                <span class="cli-version" id="cliVersion">Checking…</span>
-                <button class="cli-status-button" id="upToDateButton" style="display: none;" disabled>Current</button>
-                <button class="cli-button" id="updateButton" onclick="handleCLIUpdate()" disabled style="display: none;">
-                    <span id="updateButtonText">Update (v0.122.0)</span>
-                </button>
-                <button class="icon-button codicon codicon-copy" id="copyButton" onclick="copyCLICommand()" title="Copy install command" style="display: none;"></button>
-            </div>
+        <!-- Settings Section -->
+        <div class="settings-section">
+            <ul class="settings-list">
+                <!-- Code Sync into CMX environment -->
+                <li class="settings-row">
+                    <div class="info-row">
+                        <img src="{{CHECK_ICON_URI}}" class="info-icon white" alt="Check" aria-hidden="true" />
+                        <span class="info-label">Code Sync into CMX environment</span>
+                        <label class="toggle-switch" for="codeSyncToggle" aria-label="Toggle code sync into CMX environment">
+                            <input type="checkbox" id="codeSyncToggle" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </li>
+
+                <!-- Auto-lint -->
+                <li class="settings-row">
+                    <div class="info-row">
+                        <img src="{{CHECK_ICON_URI}}" class="info-icon white" alt="Check" aria-hidden="true" />
+                        <span class="info-label">Auto-lint</span>
+                        <label class="toggle-switch" for="autoLintToggle" aria-label="Toggle auto-lint">
+                            <input type="checkbox" id="autoLintToggle" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </li>
+
+                <!-- CLI Status -->
+                <li class="settings-row">
+                    <div class="info-row">
+                        <svg class="info-icon unknown" id="cliIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 19h8"/>
+                            <path d="m4 17 6-6-6-6"/>
+                        </svg>
+                        <span class="info-label">Replicated CLI</span>
+                        <div class="cli-status-right">
+                            <span id="cliVersion">Checking…</span>
+                            <span id="cliStatus"></span>
+                        </div>
+                    </div>
+                </li>
+            </ul>
         </div>
     </div>
 
     <script>
+        // VS Code API
         const vscode = acquireVsCodeApi();
-        let autoLintEnabled = false;
-        let cliInstalled = false;
-        let currentVersion = null;
-        let latestVersion = null;
 
-        function toggleAutoLint() {
-            vscode.postMessage({ type: 'toggleAutoLint' });
-        }
+        // State
+        const state = {
+            codeSyncEnabled: false,
+            autoLintEnabled: false,
+            cliInstalled: false,
+            currentVersion: null,
+            latestVersion: null
+        };
 
-        function handleCheckboxKeydown(event) {
-            // Support keyboard navigation: Space or Enter to toggle
-            if (event.key === ' ' || event.key === 'Enter') {
-                event.preventDefault();
-                toggleAutoLint();
-            }
-        }
+        // DOM Elements (cached for performance)
+        const elements = {
+            codeSyncToggle: document.getElementById('codeSyncToggle'),
+            autoLintToggle: document.getElementById('autoLintToggle'),
+            testEnvBtn: document.getElementById('testEnvBtn'),
+            customSelectBtn: document.getElementById('customSelectBtn'),
+            customDropdown: document.getElementById('customDropdown'),
+            dropdownItems: document.querySelectorAll('.custom-dropdown-item'),
+            selectedIcon: document.getElementById('selectedIcon'),
+            selectedText: document.getElementById('selectedText'),
+            cliIcon: document.getElementById('cliIcon'),
+            cliVersion: document.getElementById('cliVersion'),
+            cliStatus: document.getElementById('cliStatus'),
+            cmxInfoContainer: document.getElementById('cmxInfoContainer'),
+            cmxTooltip: document.getElementById('cmxTooltip')
+        };
 
-        function testInEnvironment(environment) {
-            if (environment) {
-                hideDropdown();
-            }
-            vscode.postMessage({ 
-                type: 'testInEnvironment',
-                environment: environment
-            });
-        }
+        // Current selected value
+        let selectedValue = 'k3s-1node';
 
-        function toggleDropdown() {
-            const dropdown = document.getElementById('envDropdown');
-            dropdown.classList.toggle('show');
-        }
+        // Utility Functions
+        const postMessage = (type, data = {}) => {
+            vscode.postMessage({ type, ...data });
+        };
 
-        function hideDropdown() {
-            const dropdown = document.getElementById('envDropdown');
-            dropdown.classList.remove('show');
-        }
+        const toggleClass = (element, className, condition) => {
+            element?.classList.toggle(className, condition);
+        };
 
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            const dropdown = document.getElementById('envDropdown');
-            const buttonGroup = e.target.closest('.button-group');
-            if (!buttonGroup && dropdown.classList.contains('show')) {
-                hideDropdown();
-            }
-        });
+        const setElementVisibility = (element, visible) => {
+            toggleClass(element, 'hidden', !visible);
+        };
 
-        function handleCLIUpdate() {
-            // Determine the command based on whether CLI is installed
-            const command = cliInstalled 
-                ? 'brew upgrade replicatedhq/replicated/cli'
-                : 'brew install replicatedhq/replicated/cli';
-            
-            // Run the command in terminal
-            vscode.postMessage({ 
-                type: 'runCLICommand',
-                command: command
-            });
-        }
+        const formatVersion = (version) => {
+            if (!version) return '';
+            return version.startsWith('v') ? version : `v${version}`;
+        };
 
-        function copyCLICommand() {
-            const command = 'brew upgrade replicatedhq/replicated/cli';
-            vscode.postMessage({ 
-                type: 'copyText',
-                text: command
-            });
-        }
+        const updateCLIDisplay = (installed, version, updateAvailable, latestVer) => {
+            // Update state
+            state.cliInstalled = installed;
+            state.currentVersion = version;
+            state.latestVersion = latestVer;
 
-        function updateCLIDisplay(installed, version, updateAvailable, latestVer) {
-            const cliIcon = document.getElementById('cliIcon');
-            const cliVersion = document.getElementById('cliVersion');
-            const updateButton = document.getElementById('updateButton');
-            const updateButtonText = document.getElementById('updateButtonText');
-            const copyButton = document.getElementById('copyButton');
-            const upToDateButton = document.getElementById('upToDateButton');
-            
-            if (installed) {
-                if (version) {
-                    // Add "v" prefix if not already present
-                    cliVersion.textContent = version.startsWith('v') ? version : `v${version}`;
-                } else {
-                    cliVersion.textContent = 'installed';
-                }
-                
-                if (updateAvailable && latestVer) {
-                    // Gray icon when newer version found
-                    cliIcon.className = 'cli-icon unknown';
-                    // Hide "Up to date" button, show update button and copy button
-                    upToDateButton.style.display = 'none';
-                    updateButton.style.display = 'block';
-                    updateButton.disabled = false;
-                    const latestVersionDisplay = latestVer.startsWith('v') ? latestVer : `v${latestVer}`;
-                    updateButtonText.textContent = `Update (${latestVersionDisplay})`;
-                    copyButton.style.display = 'flex';
-                    copyButton.title = 'Copy upgrade command';
-                } else {
-                    // White icon when current version enabled (up to date)
-                    cliIcon.className = 'cli-icon installed';
-                    // Show "Up to date" button, hide update button and copy button
-                    upToDateButton.style.display = 'block';
-                    updateButton.style.display = 'none';
-                    copyButton.style.display = 'none';
-                }
-            } else if (installed === false) {
-                // Gray icon when not installed
-                cliIcon.className = 'cli-icon unknown';
-                cliVersion.textContent = 'Not installed';
-                upToDateButton.style.display = 'none';
-                
-                // Show update button (as install) and copy button
-                updateButton.style.display = 'block';
-                updateButton.disabled = false;
-                updateButtonText.textContent = 'Install CLI';
-                copyButton.style.display = 'flex';
-                copyButton.title = 'Copy install command';
+            // Update icon state
+            const iconClass = (installed && !updateAvailable) ? 'installed' : 'unknown';
+            elements.cliIcon.className = `info-icon ${iconClass}`;
+
+            // Version span: 3 states
+            if (installed === undefined) {
+                elements.cliVersion.textContent = 'Checking…';
+            } else if (!installed) {
+                elements.cliVersion.textContent = 'Not found';
             } else {
-                // Gray icon when checking
-                cliIcon.className = 'cli-icon unknown';
-                cliVersion.textContent = 'Checking...';
-                upToDateButton.style.display = 'none';
-                updateButton.style.display = 'none';
-                copyButton.style.display = 'none';
+                elements.cliVersion.textContent = formatVersion(version);
             }
-        }
 
-        // Listen for status updates from extension
-        window.addEventListener('message', event => {
-            const message = event.data;
+            // Status span: "(Current)" or Update button
+            const statusEl = elements.cliStatus;
+            statusEl.innerHTML = ''; // Clear previous content
             
-            if (message.type === 'updateAutoLint') {
-                autoLintEnabled = message.enabled;
-                const checkbox = document.getElementById('autoLintCheckbox');
-                const container = document.getElementById('autoLintContainer');
-                
-                if (autoLintEnabled) {
-                    checkbox.classList.add('checked');
-                    container.setAttribute('aria-checked', 'true');
-                } else {
-                    checkbox.classList.remove('checked');
-                    container.setAttribute('aria-checked', 'false');
+            if (installed && updateAvailable && latestVer) {
+                // Show update button
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-secondary';
+                btn.textContent = `Update (${formatVersion(latestVer)})`;
+                btn.addEventListener('click', () => {
+                    postMessage('runCLICommand', { 
+                        command: 'brew upgrade replicatedhq/replicated/cli' 
+                    });
+                });
+                statusEl.appendChild(btn);
+            } else if (installed && !updateAvailable) {
+                // Show "(Current)" text
+                statusEl.textContent = '(Current)';
+            }
+            // Otherwise empty (checking or not found states)
+        };
+
+        // Code Sync Feature
+        const toggleCodeSync = () => {
+            postMessage('toggleCodeSync');
+        };
+
+        const updateCodeSyncUI = (enabled) => {
+            state.codeSyncEnabled = enabled;
+            if (elements.codeSyncToggle) {
+                elements.codeSyncToggle.checked = enabled;
+            }
+        };
+
+        // Auto-lint Feature
+        const toggleAutoLint = () => {
+            postMessage('toggleAutoLint');
+        };
+
+        const updateAutoLintUI = (enabled) => {
+            state.autoLintEnabled = enabled;
+            if (elements.autoLintToggle) {
+                elements.autoLintToggle.checked = enabled;
+            }
+        };
+
+        // Test in Environment Feature
+        const testInEnvironment = () => {
+            postMessage('testInEnvironment', { environment: selectedValue });
+        };
+
+        const toggleDropdown = () => {
+            toggleClass(elements.customDropdown, 'show');
+        };
+
+        const hideDropdown = () => {
+            elements.customDropdown?.classList.remove('show');
+        };
+
+        const selectOption = (value, text, hasIcon) => {
+            selectedValue = value;
+            elements.selectedText.textContent = text;
+            toggleClass(elements.selectedIcon, 'show', hasIcon);
+            hideDropdown();
+        };
+
+        const updateSelectedDisplay = () => {
+            const isK3s = selectedValue.startsWith('k3s-');
+            toggleClass(elements.selectedIcon, 'show', isK3s);
+        };
+
+        // CMX Info Container handlers
+        const showCMXTooltip = () => {
+            elements.cmxTooltip?.classList.add('show');
+        };
+
+        const hideCMXTooltip = () => {
+            elements.cmxTooltip?.classList.remove('show');
+        };
+
+        const openCMXDocs = () => {
+            postMessage('openExternal', { url: 'https://docs.replicated.com/vendor/testing-about' });
+        };
+
+        // Event Listeners Setup
+        const setupEventListeners = () => {
+            // Code Sync toggle
+            elements.codeSyncToggle?.addEventListener('change', toggleCodeSync);
+
+            // Auto-lint toggle
+            elements.autoLintToggle?.addEventListener('change', toggleAutoLint);
+
+            // Custom select dropdown
+            elements.customSelectBtn?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleDropdown();
+            });
+
+            elements.dropdownItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const value = item.dataset.value;
+                    const text = item.dataset.text;
+                    const hasIcon = item.querySelector('svg') !== null;
+                    selectOption(value, text, hasIcon);
+                });
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.select-wrapper') && elements.customDropdown?.classList.contains('show')) {
+                    hideDropdown();
                 }
+            });
+
+            // Test environment button
+            elements.testEnvBtn?.addEventListener('click', testInEnvironment);
+
+            // Keyboard navigation
+            elements.customSelectBtn?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleDropdown();
+                }
+            });
+
+            // Initialize selected display
+            updateSelectedDisplay();
+
+            // CMX info container hover and click handlers
+            if (elements.cmxInfoContainer) {
+                elements.cmxInfoContainer.addEventListener('mouseenter', showCMXTooltip);
+                elements.cmxInfoContainer.addEventListener('mouseleave', hideCMXTooltip);
+                elements.cmxInfoContainer.addEventListener('click', openCMXDocs);
+                elements.cmxInfoContainer.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openCMXDocs();
+                    }
+                });
+                elements.cmxInfoContainer.addEventListener('focus', showCMXTooltip);
+                elements.cmxInfoContainer.addEventListener('blur', hideCMXTooltip);
             }
-            
-            if (message.type === 'updateCLI') {
-                cliInstalled = message.installed;
-                currentVersion = message.version;
-                latestVersion = message.latestVersion;
-                const updateAvailable = message.updateAvailable || false;
-                
-                updateCLIDisplay(
-                    message.installed, 
-                    message.version, 
-                    updateAvailable,
-                    message.latestVersion
-                );
+
+            // Update tooltip width on resize (sidebar width changes)
+            window.addEventListener('resize', updateTooltipWidth);
+            // Initial tooltip width update
+            updateTooltipWidth();
+
+            // Message handler from extension
+            window.addEventListener('message', handleMessage);
+        };
+
+        // Message Handler
+        const handleMessage = (event) => {
+            const { type, enabled, installed, version, updateAvailable, latestVersion } = event.data;
+
+            switch (type) {
+                case 'updateCodeSync':
+                    updateCodeSyncUI(enabled);
+                    break;
+                case 'updateAutoLint':
+                    updateAutoLintUI(enabled);
+                    break;
+                case 'updateCLI':
+                    updateCLIDisplay(installed, version, updateAvailable, latestVersion);
+                    break;
             }
-        });
+        };
+
+        // Initialize
+        setupEventListeners();
     </script>
 </body>
 </html>

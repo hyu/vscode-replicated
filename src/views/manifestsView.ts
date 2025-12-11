@@ -41,6 +41,53 @@ class GitPlaceholderDecorationProvider implements vscode.FileDecorationProvider 
 }
 
 /**
+ * Provides lint status decorations (warning/error badges) for manifest files
+ */
+class LintDecorationProvider implements vscode.FileDecorationProvider {
+    private _onDidChangeFileDecorations = new vscode.EventEmitter<vscode.Uri | vscode.Uri[]>();
+    readonly onDidChangeFileDecorations = this._onDidChangeFileDecorations.event;
+    private lintStatuses = new Map<string, LintStatus>();
+
+    updateLintStatuses(lintStatuses: Map<string, LintStatus>) {
+        this.lintStatuses = lintStatuses;
+        // Fire event for all files with lint status
+        const uris = Array.from(lintStatuses.keys()).map(fsPath => vscode.Uri.file(fsPath));
+        if (uris.length > 0) {
+            this._onDidChangeFileDecorations.fire(uris);
+        }
+    }
+
+    clear() {
+        this.lintStatuses.clear();
+        this._onDidChangeFileDecorations.fire(vscode.Uri.file('/'));
+    }
+
+    provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
+        const lintStatus = this.lintStatuses.get(uri.fsPath);
+        if (!lintStatus || !lintStatus.hasIssues) {
+            return undefined;
+        }
+
+        // Prioritize errors over warnings
+        if (lintStatus.errors > 0) {
+            return {
+                badge: '$(error)',
+                color: new vscode.ThemeColor('errorForeground'),
+                tooltip: `${lintStatus.errors} error${lintStatus.errors !== 1 ? 's' : ''}${lintStatus.warnings > 0 ? `, ${lintStatus.warnings} warning${lintStatus.warnings !== 1 ? 's' : ''}` : ''}`
+            };
+        } else if (lintStatus.warnings > 0) {
+            return {
+                badge: '$(warning)',
+                color: new vscode.ThemeColor('warningForeground'),
+                tooltip: `${lintStatus.warnings} warning${lintStatus.warnings !== 1 ? 's' : ''}`
+            };
+        }
+
+        return undefined;
+    }
+}
+
+/**
  * Organizes Replicated manifest files by install method in VS Code tree view
  */
 export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestItem> {
@@ -51,12 +98,15 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     private lintHasRun = false;
     private gitApi: any | undefined;
     private gitPlaceholderProvider: GitPlaceholderDecorationProvider;
+    private lintDecorationProvider: LintDecorationProvider;
     private extensionUri: vscode.Uri;
 
     constructor(private diagnosticCollection: vscode.DiagnosticCollection, extensionUri: vscode.Uri) {
         this.extensionUri = extensionUri;
         this.gitPlaceholderProvider = new GitPlaceholderDecorationProvider();
+        this.lintDecorationProvider = new LintDecorationProvider();
         vscode.window.registerFileDecorationProvider(this.gitPlaceholderProvider);
+        vscode.window.registerFileDecorationProvider(this.lintDecorationProvider);
 
         vscode.languages.onDidChangeDiagnostics(() => {
             this.updateLintStatuses();
@@ -80,7 +130,7 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             this.gitApi = gitExtension.exports?.getAPI(1);
             this.gitApi?.onDidChangeState(() => this.refresh());
         } catch (error) {
-            console.log('Git extension not available:', error);
+            // Git extension not available - this is expected in some environments
         }
     }
 
@@ -89,6 +139,7 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     }
 
     private updateLintStatuses(): void {
+        const previousFiles = new Set(this.lintStatuses.keys());
         this.lintStatuses.clear();
         
         this.diagnosticCollection.forEach((uri, diagnostics) => {
@@ -106,6 +157,20 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
                 hasIssues: errors > 0 || warnings > 0 || info > 0
             });
         });
+        
+        // Update lint decoration provider - include files that previously had lint status
+        // to ensure decorations are cleared when diagnostics are removed
+        const allFiles = new Set([...previousFiles, ...this.lintStatuses.keys()]);
+        const statusMap = new Map<string, LintStatus>();
+        allFiles.forEach(fsPath => {
+            statusMap.set(fsPath, this.lintStatuses.get(fsPath) || {
+                errors: 0,
+                warnings: 0,
+                info: 0,
+                hasIssues: false
+            });
+        });
+        this.lintDecorationProvider.updateLintStatuses(statusMap);
         
         if (this.lintStatuses.size > 0) {
             this.lintHasRun = true;
@@ -232,9 +297,8 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         files: ManifestItem[],
         manifestPath: string
     ): ManifestItem {
-        const description = files.length > 0 
-            ? `${files.length} file${files.length !== 1 ? 's' : ''}` 
-            : 'No files';
+        // Show file count in parentheses (right-aligned in tree view)
+        const description = files.length > 0 ? `(${files.length})` : '';
         
         const item = new ManifestItem(
             title,
@@ -267,7 +331,7 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
 
     private createSeparator(): ManifestItem {
         const separator = new ManifestItem(
-            '┄┄┄┄┄┄┄┄┄┄┄',
+            '',
             '',
             vscode.TreeItemCollapsibleState.None,
             undefined,
@@ -277,6 +341,7 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             undefined
         );
         separator.contextValue = 'separator';
+        separator.tooltip = '';
         return separator;
     }
 
@@ -312,7 +377,7 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         const gitStatus = this.getGitStatus(fullPath);
         this.gitPlaceholderProvider.setPlaceholder(fullPath, !gitStatus);
         
-        const description = this.buildFileDescription(manifestInfo.kind, lintStatus);
+        const description = this.buildFileDescription(manifestInfo.kind);
         const item = new ManifestItem(
             fileName,
             description,
@@ -324,6 +389,10 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
             basePath
         );
         
+        // Note: VS Code doesn't support colored ThemeIcons directly
+        // File icon coloring is handled by FileDecorationProvider (LintDecorationProvider)
+        // which shows colored badges next to files with lint issues
+        
         item.command = {
             command: 'replicated.openManifest',
             title: 'Open Manifest',
@@ -332,7 +401,17 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         
         item.resourceUri = vscode.Uri.file(fullPath);
         item.tooltip = this.buildFileTooltip(manifestInfo, fileName);
-        item.contextValue = docsUrl ? 'manifestFileWithDocs' : 'manifestFile';
+        
+        // Update context value to reflect lint status for lint button icon
+        let contextValue = docsUrl ? 'manifestFileWithDocs' : 'manifestFile';
+        if (lintStatus?.hasIssues) {
+            if (lintStatus.errors > 0) {
+                contextValue = docsUrl ? 'manifestFileWithDocsLintError' : 'manifestFileLintError';
+            } else if (lintStatus.warnings > 0) {
+                contextValue = docsUrl ? 'manifestFileWithDocsLintWarning' : 'manifestFileLintWarning';
+            }
+        }
+        item.contextValue = contextValue;
         
         if (docsUrl) {
             (item as any).docsUrl = docsUrl;
@@ -341,27 +420,8 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
         return item;
     }
 
-    private buildFileDescription(kind: string | undefined, lintStatus: LintStatus | undefined): string {
-        let description = kind?.trim() || '';
-        
-        if (this.lintHasRun && lintStatus?.hasIssues) {
-            const parts: string[] = [];
-            if (lintStatus.errors > 0) {
-                parts.push(`${lintStatus.errors} error${lintStatus.errors !== 1 ? 's' : ''}`);
-            }
-            if (lintStatus.warnings > 0) {
-                parts.push(`${lintStatus.warnings} warning${lintStatus.warnings !== 1 ? 's' : ''}`);
-            }
-            if (lintStatus.info > 0) {
-                parts.push(`${lintStatus.info} info`);
-            }
-            
-            if (parts.length > 0 && description) {
-                description += ' - ' + parts.join(' ');
-            }
-        }
-        
-        return description.trim();
+    private buildFileDescription(kind: string | undefined): string {
+        return kind?.trim() || '';
     }
 
     private buildFileTooltip(manifestInfo: ManifestInfo, fileName: string): string {
@@ -439,6 +499,14 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
     }
 
     private parseManifestKind(filePath: string): ManifestInfo {
+        // Handle .tgz files specially - they're archives, not YAML
+        if (filePath.toLowerCase().endsWith('.tgz')) {
+            return {
+                kind: 'HelmArchive',
+                apiVersion: undefined
+            };
+        }
+        
         try {
             const content = fs.readFileSync(filePath, 'utf8');
             const docs = yaml.parseAllDocuments(content);
@@ -469,7 +537,7 @@ export class ManifestsViewProvider implements vscode.TreeDataProvider<ManifestIt
 
     private isManifestFile(filename: string): boolean {
         const ext = path.extname(filename).toLowerCase();
-        return ext === '.yaml' || ext === '.yml';
+        return ext === '.yaml' || ext === '.yml' || ext === '.tgz';
     }
 }
 

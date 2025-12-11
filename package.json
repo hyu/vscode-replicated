@@ -90,13 +90,39 @@
         },
         {
           "command": "replicated.lintFile",
+          "when": "view == replicatedManifests && viewItem == manifestFileLintError",
+          "group": "inline@2",
+          "icon": "$(error)"
+        },
+        {
+          "command": "replicated.lintFile",
+          "when": "view == replicatedManifests && viewItem == manifestFileLintWarning",
+          "group": "inline@2",
+          "icon": "$(warning)"
+        },
+        {
+          "command": "replicated.lintFile",
           "when": "view == replicatedManifests && viewItem == manifestFile",
-          "group": "inline@2"
+          "group": "inline@2",
+          "icon": "$(pass)"
+        },
+        {
+          "command": "replicated.lintFile",
+          "when": "view == replicatedManifests && viewItem == manifestFileWithDocsLintError",
+          "group": "inline@2",
+          "icon": "$(error)"
+        },
+        {
+          "command": "replicated.lintFile",
+          "when": "view == replicatedManifests && viewItem == manifestFileWithDocsLintWarning",
+          "group": "inline@2",
+          "icon": "$(warning)"
         },
         {
           "command": "replicated.lintFile",
           "when": "view == replicatedManifests && viewItem == manifestFileWithDocs",
-          "group": "inline@2"
+          "group": "inline@2",
+          "icon": "$(pass)"
         },
         {
           "command": "replicated.openDocs",

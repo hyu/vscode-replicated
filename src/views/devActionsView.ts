@@ -11,6 +11,7 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'replicatedActions';
 
     private _view?: vscode.WebviewView;
+    private codeSyncEnabled: boolean = false;
     private autoLintEnabled: boolean = false;
     private cliService: CLIService;
 
@@ -42,6 +43,9 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(data => {
             switch (data.type) {
+                case 'toggleCodeSync':
+                    vscode.commands.executeCommand('replicated.toggleCodeSync');
+                    break;
                 case 'toggleAutoLint':
                     vscode.commands.executeCommand('replicated.toggleAutoLint');
                     break;
@@ -83,8 +87,23 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand('replicated.runCLICommand', data.command);
                     }
                     break;
+                case 'openExternal':
+                    if (data.url) {
+                        vscode.env.openExternal(vscode.Uri.parse(data.url));
+                    }
+                    break;
             }
         });
+    }
+
+    public setCodeSyncEnabled(enabled: boolean) {
+        this.codeSyncEnabled = enabled;
+        if (this._view) {
+            this._view.webview.postMessage({
+                type: 'updateCodeSync',
+                enabled
+            });
+        }
     }
 
     public setAutoLintEnabled(enabled: boolean) {
@@ -111,6 +130,12 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
     }
 
     private _getHtmlForWebview(webview: vscode.Webview): string {
+        // Generate icon URIs using asWebviewUri() for external icon files
+        // These can be used in the HTML template without inlining
+        const checkIconUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'img', 'check-icon.svg')
+        );
+        
         // Get the path to the HTML template file
         // Try multiple possible locations to handle both development and packaged scenarios
         const possiblePaths = [
@@ -125,7 +150,12 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
         for (const htmlPath of possiblePaths) {
             try {
                 if (fs.existsSync(htmlPath)) {
-                    const htmlContent = fs.readFileSync(htmlPath, 'utf-8');
+                    let htmlContent = fs.readFileSync(htmlPath, 'utf-8');
+                    // Replace placeholder with actual icon URI
+                    htmlContent = htmlContent.replace(
+                        /\{\{CHECK_ICON_URI\}\}/g,
+                        checkIconUri.toString()
+                    );
                     return htmlContent;
                 }
             } catch (error) {
