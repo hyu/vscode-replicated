@@ -1,0 +1,73 @@
+# VS Code Extension Webview Guidelines
+
+When working with VS Code extension webviews (including sidebar webviews), refer to the comprehensive documentation in `.cursor/vscode-webview-limitations.md` for detailed information about CSS transitions, animations, and limitations.
+
+## Quick Reference: Webview Limitations
+
+### Supported CSS Features
+- ✅ CSS Transitions (all properties)
+- ✅ CSS Animations with `@keyframes`
+- ✅ Transform animations (GPU-accelerated)
+- ✅ Most CSS properties can be animated
+
+### Critical Limitations
+- 🚫 **Content Security Policy (CSP)**: No inline scripts, no external resources without `asWebviewUri()`
+- 🚫 **Resource Loading**: Must use `webview.asWebviewUri()` for local resources
+- ⚠️ **Performance**: Prefer GPU-accelerated properties (`transform`, `opacity`) over layout properties
+
+### Best Practices
+1. Use VS Code theme variables (`var(--vscode-*)`)
+2. Prefer `transform` and `opacity` for animations
+3. Keep animations subtle (0.1s-0.3s durations)
+4. Use `<script>` tags (not inline scripts)
+5. Test across VS Code versions
+
+## When `/webview` is mentioned
+
+When the user types `/webview` or asks about webview limitations, animations, or CSS in VS Code extensions:
+
+1. **Reference the full documentation**: Point to `.cursor/vscode-webview-limitations.md` for comprehensive details
+2. **Provide specific examples**: Use code examples from the documentation
+3. **Highlight limitations**: Always mention CSP restrictions and resource loading requirements
+4. **Suggest best practices**: Recommend GPU-accelerated animations and VS Code theme variables
+
+## Common Webview Patterns
+
+### Dropdown Animation
+```css
+.dropdown-menu {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+    pointer-events: none;
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.dropdown-menu.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+```
+
+### Loading Spinner
+```css
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+    animation: spin 1s linear infinite;
+}
+```
+
+### Resource Loading (TypeScript)
+```typescript
+// ✅ Correct
+const styleUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(this._extensionUri, 'media', 'styles.css')
+);
+```
+
+For complete documentation, see: `.cursor/vscode-webview-limitations.md`
+
