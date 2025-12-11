@@ -850,7 +850,7 @@
                 btn.disabled = true;
                 btn.classList.add('loading');
                 if (btnText) {
-                    btnText.textContent = 'Provisioning...';
+                    btnText.style.display = 'none';
                 }
             }
             
@@ -863,7 +863,7 @@
                     btn.disabled = false;
                     btn.classList.remove('loading');
                     if (btnText) {
-                        btnText.textContent = 'Go';
+                        btnText.style.display = '';
                     }
                 }
             }, 3000);
