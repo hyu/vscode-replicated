@@ -29,7 +29,7 @@ export const CATEGORY_CONFIGS: CategoryConfig[] = [
         id: 'embedded-cluster',
         title: 'Embedded Cluster',
         icon: 'package',
-        customIconPath: 'img/k8s-red.svg', // Uses BRAND_COLORS.replicatedRed (#FF4856)
+        customIconPath: 'img/k8s-red.svg', // Uses BRAND_COLORS.replicatedRed.p50 (rgba(255, 72, 86, 0.5))
         tooltip: 'Embedded Cluster (EC) is an install method that installs an embedded cluster, then installs your application.\nFor customer environments with NO existing Kubernetes, like Linux VM.',
         docsUrl: 'https://docs.replicated.com/vendor/embedded-overview',
         separator: true
@@ -38,7 +38,7 @@ export const CATEGORY_CONFIGS: CategoryConfig[] = [
         id: 'kots',
         title: 'KOTS',
         icon: 'server-environment',
-        customIconPath: 'img/k8s-blue.svg', // Uses BRAND_COLORS.nebulaPurple (#6977FB)
+        customIconPath: 'img/k8s-mint.svg', // Uses BRAND_COLORS.cyberMint.p50 (rgba(81, 233, 240, 0.5))
         tooltip: 'KOTS (Kubernetes Off-The-Shelf) is an install method that installs your application in an existing Kubernetes cluster.\nProvides an Admin Console for managing installations.',
         docsUrl: 'https://docs.replicated.com/intro-kots',
         separator: true
@@ -110,11 +110,19 @@ export function categorizeByInstallMethod(
     }
     
     // Helm-specific files
+    if (lowerFileName.endsWith('.tgz')) {
+        return 'helm';
+    }
+    
     if (lowerFileName.includes('chart') && !lowerFileName.includes('helmchart') && kind !== 'HelmChart') {
         return 'helm';
     }
     
     if (kind === 'Chart') {
+        return 'helm';
+    }
+    
+    if (kind === 'HelmArchive') {
         return 'helm';
     }
     
@@ -155,6 +163,9 @@ export const KIND_DESCRIPTIONS = new Map<string, string>([
     ['troubleshoot.sh/v1beta2/Redactor', 'Define patterns to automatically remove your customer\'s sensitive info from support bundles they send you.\ne.g., passwords, API tokens, encryption keys'],
     ['troubleshoot.sh/v1beta2/Analyzer', 'Define custom analysis rules for support bundles to automatically diagnose common issues in your customer\'s environment'],
     
+    // Helm Resources
+    ['HelmArchive', 'Packaged Helm chart archive (.tgz file) ready for distribution.\nCreated with `helm package` command and uploaded to Replicated with `replicated release create --chart`'],
+    
     // Standard Kubernetes Resources
     ['apps/v1/Deployment', 'Manage your application pods in your customer\'s cluster\ne.g., define rolling updates, scaling behavior, ensure desired replicas run…'],
     ['v1/Service', 'Provide a stable network endpoint for your app in your customer\'s cluster. Works like a load balancer routing traffic to your pods.'],
@@ -173,6 +184,11 @@ export function getKindDescription(
     kind: string,
     fileName: string
 ): string | undefined {
+    // Handle HelmArchive specially
+    if (kind === 'HelmArchive') {
+        return KIND_DESCRIPTIONS.get('HelmArchive');
+    }
+    
     const key = apiVersion && kind ? `${apiVersion}/${kind}` : undefined;
     
     if (key) {
@@ -211,7 +227,8 @@ export function getIconForKind(kind: string | undefined): string {
         'Ingress',
         'PersistentVolumeClaim',
         'Chart',
-        'HelmChart'
+        'HelmChart',
+        'HelmArchive'
     ];
     
     return applicationKinds.includes(kind) ? 'package' : 'code';

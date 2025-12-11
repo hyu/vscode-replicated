@@ -26,7 +26,6 @@ export class LintService {
             );
 
             lintstream.on('response', async (response: PlainResponse) => {
-                console.log('success: ' + response.statusCode);
                 let rawData = '';
                 response.on('data', (chunk) => { rawData += chunk; });
                 response.on('end', () => {

@@ -53,5 +53,3 @@ export const STATUS_COLORS = {
     /** Ready background */
     readyBackground: BRAND_COLORS.nebulaPurple.p25,
 } as const;
-
-

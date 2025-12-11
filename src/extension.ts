@@ -8,23 +8,18 @@ import { LintService } from './services/lintService';
 import { registerCommands, withProgress, getManifestsPath } from './utils/commandUtils';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('🚀 Replicated extension activated!');
-    console.log('Extension path:', context.extensionUri.fsPath);
-    
     const diagnosticCollection = vscode.languages.createDiagnosticCollection('replicated');
     const cliService = CLIService.getInstance();
     const lintService = new LintService();
     let enableOnSave = false;
 
     // Register dev actions view
-    console.log('📋 Registering DevActionsViewProvider with viewType:', DevActionsViewProvider.viewType);
     const devActionsViewProvider = new DevActionsViewProvider(context.extensionUri);
     const registration = vscode.window.registerWebviewViewProvider(
         DevActionsViewProvider.viewType,
         devActionsViewProvider
     );
     context.subscriptions.push(registration);
-    console.log('✅ DevActionsViewProvider registered successfully');
 
     // Register manifests tree view
     const manifestsViewProvider = new ManifestsViewProvider(diagnosticCollection, context.extensionUri);
@@ -158,6 +153,59 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// Run CLI command in terminal
+	let d15 = vscode.commands.registerCommand('replicated.runCLICommand', async (command: string) => {
+		if (!command) {
+			vscode.window.showErrorMessage('No command provided');
+			return;
+		}
+
+		// Create or get existing terminal named "Replicated CLI"
+		let terminal = vscode.window.terminals.find(t => t.name === 'Replicated CLI');
+		if (!terminal) {
+			terminal = vscode.window.createTerminal('Replicated CLI');
+		}
+
+		// Send the command to the terminal
+		terminal.sendText(command);
+		
+		// Show the terminal so the user can see the output
+		terminal.show();
+
+		// Wait a bit for the command to complete, then check CLI status again
+		setTimeout(async () => {
+			// Clear cache to force fresh check
+			cliService.clearCache();
+			
+			// Re-check CLI status and update the view
+			await devActionsViewProvider.updateCLIStatus();
+			
+			// Get the updated status to show a message
+			const status = await cliService.checkCLIStatus();
+			if (status.installed) {
+				vscode.window.showInformationMessage(
+					`Replicated CLI check complete. Version: ${status.version}${status.updateAvailable ? ` (Update available: ${status.latestVersion})` : ''}`,
+					'Check Again'
+				).then(selection => {
+					if (selection === 'Check Again') {
+						cliService.clearCache();
+						devActionsViewProvider.updateCLIStatus();
+					}
+				});
+			} else {
+				vscode.window.showWarningMessage(
+					'Replicated CLI not found. Please check the terminal output.',
+					'Check Again'
+				).then(selection => {
+					if (selection === 'Check Again') {
+						cliService.clearCache();
+						devActionsViewProvider.updateCLIStatus();
+					}
+				});
+			}
+		}, 5000); // Wait 5 seconds for brew commands to complete
+	});
+
 	// Check CLI status
 	let d10 = vscode.commands.registerCommand('replicated.checkCLI', async () => {
 		cliService.clearCache();
@@ -215,7 +263,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14);
+	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15);
 }
 
 export function deactivate() {}

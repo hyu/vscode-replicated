@@ -155,6 +155,7 @@
             align-items: center;
             gap: 8px;
             font-size: 12px;
+            flex-wrap: nowrap;
         }
         .cli-icon {
             width: 16px;
@@ -172,10 +173,11 @@
         .cli-label {
             color: var(--vscode-foreground);
             font-weight: 500;
+            flex-shrink: 0;
         }
         .cli-version {
             color: var(--vscode-descriptionForeground);
-            margin-left: auto;
+            flex-shrink: 0;
         }
         .cli-status-button {
             background-color: transparent;
@@ -185,7 +187,8 @@
             font-family: var(--vscode-font-family);
             padding: 2px 6px;
             cursor: default;
-            margin-left: 8px;
+            margin-left: auto;
+            flex-shrink: 0;
         }
         .cli-status-button:disabled {
             opacity: 0.7;
@@ -204,6 +207,8 @@
             cursor: pointer;
             font-size: 12px;
             font-family: var(--vscode-font-family);
+            margin-left: auto;
+            flex-shrink: 0;
         }
         .cli-button:hover {
             background-color: var(--vscode-button-secondaryHoverBackground);
@@ -223,6 +228,7 @@
             justify-content: center;
             border-radius: 3px;
             font-size: 14px;
+            flex-shrink: 0;
         }
         .icon-button:hover {
             background-color: var(--vscode-toolbar-hoverBackground);
@@ -235,18 +241,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- Auto-lint checkbox -->
-        <div class="checkbox-container" 
-             role="checkbox" 
-             aria-checked="false" 
-             aria-label="Auto-lint on save"
-             tabindex="0"
-             id="autoLintContainer"
-             onclick="toggleAutoLint()"
-             onkeydown="handleCheckboxKeydown(event)">
-            <div class="checkbox" id="autoLintCheckbox" aria-hidden="true"></div>
-            <span class="checkbox-label">Auto-lint on save</span>
-        </div>
         
         <!-- Test in Environment button with dropdown -->
         <div class="button-group">
@@ -263,6 +257,21 @@
                 <button class="dropdown-item" onclick="testInEnvironment('production')">Production</button>
             </div>
         </div>
+
+
+                <!-- Auto-lint checkbox -->
+                <div class="checkbox-container" 
+                role="checkbox" 
+                aria-checked="false" 
+                aria-label="Auto-lint on save"
+                tabindex="0"
+                id="autoLintContainer"
+                onclick="toggleAutoLint()"
+                onkeydown="handleCheckboxKeydown(event)">
+               <div class="checkbox" id="autoLintCheckbox" aria-hidden="true"></div>
+               <span class="checkbox-label">Auto-lint on save</span>
+           </div>
+   
         
         <!-- CLI Status -->
         <div class="cli-status">
@@ -272,14 +281,12 @@
                     <path d="m4 17 6-6-6-6"/>
                 </svg>
                 <span class="cli-label">Replicated CLI</span>
-                <span class="cli-version" id="cliVersion">Checking...</span>
-                <button class="cli-status-button" id="upToDateButton" style="display: none;" disabled>Up to date</button>
-            </div>
-            <div class="cli-actions" id="cliActions" style="display: none;">
-                <button class="cli-button" id="updateButton" onclick="handleCLIUpdate()" disabled>
+                <span class="cli-version" id="cliVersion">Checking…</span>
+                <button class="cli-status-button" id="upToDateButton" style="display: none;" disabled>Current</button>
+                <button class="cli-button" id="updateButton" onclick="handleCLIUpdate()" disabled style="display: none;">
                     <span id="updateButtonText">Update (v0.122.0)</span>
                 </button>
-                <button class="icon-button codicon codicon-copy" id="copyButton" onclick="copyCLICommand()" title="Copy install command"></button>
+                <button class="icon-button codicon codicon-copy" id="copyButton" onclick="copyCLICommand()" title="Copy install command" style="display: none;"></button>
             </div>
         </div>
     </div>
@@ -333,7 +340,16 @@
         });
 
         function handleCLIUpdate() {
-            vscode.postMessage({ type: 'installCLI' });
+            // Determine the command based on whether CLI is installed
+            const command = cliInstalled 
+                ? 'brew upgrade replicatedhq/replicated/cli'
+                : 'brew install replicatedhq/replicated/cli';
+            
+            // Run the command in terminal
+            vscode.postMessage({ 
+                type: 'runCLICommand',
+                command: command
+            });
         }
 
         function copyCLICommand() {
@@ -347,28 +363,37 @@
         function updateCLIDisplay(installed, version, updateAvailable, latestVer) {
             const cliIcon = document.getElementById('cliIcon');
             const cliVersion = document.getElementById('cliVersion');
-            const cliActions = document.getElementById('cliActions');
             const updateButton = document.getElementById('updateButton');
             const updateButtonText = document.getElementById('updateButtonText');
             const copyButton = document.getElementById('copyButton');
             const upToDateButton = document.getElementById('upToDateButton');
             
             if (installed) {
-                // Icon: white when installed
-                cliIcon.className = 'cli-icon installed';
-                cliVersion.textContent = version || 'installed';
+                if (version) {
+                    // Add "v" prefix if not already present
+                    cliVersion.textContent = version.startsWith('v') ? version : `v${version}`;
+                } else {
+                    cliVersion.textContent = 'installed';
+                }
                 
                 if (updateAvailable && latestVer) {
-                    // Hide "Up to date" button, show update button in actions row
+                    // Gray icon when newer version found
+                    cliIcon.className = 'cli-icon unknown';
+                    // Hide "Up to date" button, show update button and copy button
                     upToDateButton.style.display = 'none';
-                    cliActions.style.display = 'flex';
+                    updateButton.style.display = 'block';
                     updateButton.disabled = false;
-                    updateButtonText.textContent = `Update (${latestVer})`;
+                    const latestVersionDisplay = latestVer.startsWith('v') ? latestVer : `v${latestVer}`;
+                    updateButtonText.textContent = `Update (${latestVersionDisplay})`;
+                    copyButton.style.display = 'flex';
                     copyButton.title = 'Copy upgrade command';
                 } else {
-                    // Show "Up to date" button next to version, hide actions row
+                    // White icon when current version enabled (up to date)
+                    cliIcon.className = 'cli-icon installed';
+                    // Show "Up to date" button, hide update button and copy button
                     upToDateButton.style.display = 'block';
-                    cliActions.style.display = 'none';
+                    updateButton.style.display = 'none';
+                    copyButton.style.display = 'none';
                 }
             } else if (installed === false) {
                 // Gray icon when not installed
@@ -376,17 +401,19 @@
                 cliVersion.textContent = 'Not installed';
                 upToDateButton.style.display = 'none';
                 
-                // Show actions with install option
-                cliActions.style.display = 'flex';
+                // Show update button (as install) and copy button
+                updateButton.style.display = 'block';
                 updateButton.disabled = false;
                 updateButtonText.textContent = 'Install CLI';
+                copyButton.style.display = 'flex';
                 copyButton.title = 'Copy install command';
             } else {
                 // Gray icon when checking
                 cliIcon.className = 'cli-icon unknown';
                 cliVersion.textContent = 'Checking...';
                 upToDateButton.style.display = 'none';
-                cliActions.style.display = 'none';
+                updateButton.style.display = 'none';
+                copyButton.style.display = 'none';
             }
         }
 

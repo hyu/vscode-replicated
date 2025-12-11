@@ -25,7 +25,6 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
         context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken,
     ) {
-        console.log('DevActionsViewProvider.resolveWebviewView called');
         this._view = webviewView;
 
         webviewView.webview.options = {
@@ -69,6 +68,21 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                         });
                     }
                     break;
+                case 'runCLICommand':
+                    if (data.command) {
+                        // Show checking state immediately
+                        if (this._view) {
+                            this._view.webview.postMessage({
+                                type: 'updateCLI',
+                                installed: undefined, // undefined means checking
+                                version: null,
+                                updateAvailable: false,
+                                latestVersion: null
+                            });
+                        }
+                        vscode.commands.executeCommand('replicated.runCLICommand', data.command);
+                    }
+                    break;
             }
         });
     }
@@ -89,7 +103,9 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
             this._view.webview.postMessage({
                 type: 'updateCLI',
                 installed: status.installed,
-                version: status.version
+                version: status.version,
+                updateAvailable: status.updateAvailable,
+                latestVersion: status.latestVersion
             });
         }
     }
