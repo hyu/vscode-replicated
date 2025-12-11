@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path/posix';
 import { ManifestsViewProvider } from './views/manifestsView';
 import { DevActionsViewProvider } from './views/devActionsView';
+import { ClusterResourcesViewProvider } from './views/clusterResourcesView';
 import { CLIService } from './services/cliService';
 import { ClusterDashboardPanel } from './views/clusterDashboardView';
 import { LintService } from './services/lintService';
@@ -44,6 +45,15 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Initialize CLI status
     devActionsViewProvider.updateCLIStatus();
+
+    // Hide cluster resources initially
+    vscode.commands.executeCommand('setContext', 'replicated.clusterActive', false);
+
+    // Register cluster resources tree view (demo with mock data)
+    const clusterResourcesViewProvider = new ClusterResourcesViewProvider();
+    vscode.window.createTreeView('replicatedClusterResources', {
+        treeDataProvider: clusterResourcesViewProvider
+    });
 
 	let d1 = vscode.commands.registerCommand('replicated.lint.enable', () => {
 		diagnosticCollection.clear();
@@ -203,8 +213,14 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.window.showInformationMessage(`Deployed to ${environment} environment successfully!`);
 	});
 	
-	// Show Cluster Resources Dashboard
+	// Show Cluster Resources tree view (demo - makes the view visible)
 	let d14 = vscode.commands.registerCommand('replicated.showClusterResources', () => {
+		vscode.commands.executeCommand('setContext', 'replicated.clusterActive', true);
+		clusterResourcesViewProvider.refresh();
+	});
+
+	// Show Cluster Dashboard Panel
+	let d17 = vscode.commands.registerCommand('replicated.showClusterDashboard', () => {
 		ClusterDashboardPanel.createOrShow(context.extensionUri);
 	});
 
@@ -268,7 +284,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}, 5000); // Wait 5 seconds for brew commands to complete
 	});
 
-	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15, d16);
+	context.subscriptions.push(d1, d2, d3, d4, d5, d6, d7, d8, d9, d10, d11, d12, d13, d14, d15, d16, d17);
 }
 
 export function deactivate() {}

@@ -36,6 +36,11 @@
           "name": "Manifests"
         },
         {
+          "id": "replicatedClusterResources",
+          "name": "CMX Cluster Resources",
+          "when": "replicated.clusterActive"
+        },
+        {
           "id": "replicatedActions",
           "name": "Replicated Dev",
           "type": "webview"
@@ -62,6 +67,10 @@
         "command": "replicated.openDocs",
         "title": "Learn More",
         "icon": "$(info)"
+      },
+      {
+        "command": "replicated.showClusterResources",
+        "title": "Show CMX Cluster Resources"
       }
     ],
     "menus": {

@@ -59,6 +59,10 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                 case 'testInEnvironment':
                     if (data.environment) {
                         vscode.commands.executeCommand('replicated.testInEnvironmentDirect', data.environment);
+                        // Show the cluster resources view after a delay (simulating provisioning)
+                        setTimeout(() => {
+                            vscode.commands.executeCommand('replicated.showClusterResources');
+                        }, 3000);
                     } else {
                         vscode.commands.executeCommand('replicated.testInEnvironment');
                     }
@@ -79,7 +83,7 @@ export class DevActionsViewProvider implements vscode.WebviewViewProvider {
                     this.handleLogout();
                     break;
                 case 'openDashboard':
-                    vscode.commands.executeCommand('replicated.showClusterResources');
+                    vscode.commands.executeCommand('replicated.showClusterDashboard');
                     break;
                 case 'copyText':
                     if (data.text) {
